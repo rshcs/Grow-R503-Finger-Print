@@ -19,8 +19,8 @@ class R503:
         self.addr = c_uint32(addr)
 
 
-    def send_msg(self, pkgid, pkglen, instcode, pkg):
-        return self.b_array(self.HEADER, self.addr, pkgid, pkglen, instcode, pkg) + self.calc_checksum(pkgid, pkglen, instcode, pkg).value.to_bytes(2, 'big')
+    def send_msg(self, *args): # pkgid, pkglen, instcode, pkg
+        return self.b_array(self.HEADER, self.addr, *args) + self.calc_checksum(*args).value.to_bytes(2, 'big')
 
     @staticmethod
     def b_array(*args):
@@ -29,38 +29,61 @@ class R503:
             array_of_bytes += arg.value.to_bytes(sizeof(arg), 'big')
         return array_of_bytes
 
-    def calc_checksum(self, pkg_id, pkglen, instr_code, pkg):
-        whole_pkg = self.b_array(pkg_id, instr_code, pkglen, pkg)
+    def calc_checksum(self, *args):
+        whole_pkg = self.b_array(*args)
         chksum = sum(whole_pkg)
         return c_uint16(chksum)
     
     def read_msg(self, data_stream):
-        hdr_rd = data_stream[:2]
-        adr_rd = data_stream[2:6]
-        instr_code_rd = data_stream[6]
-        pkg_len_rd = data_stream[7:9]
-        return hdr_rd, adr_rd, instr_code_rd, pkg_len_rd
+        hdr_rd = int.from_bytes(data_stream[:2], 'big') # Header
+        adr_rd = int.from_bytes(data_stream[2:6], 'big') # Address
+        pkg_id_rd = data_stream[6] # Package ID
+        pkg_len_rd = int.from_bytes(data_stream[7:9], 'big') # Length
+        conf_code_rd = int.from_bytes(data_stream[9:7+pkg_len_rd], 'big') # Actual package
+        chksum_rd = int.from_bytes(data_stream[-2:], 'big') # Checksum
+        return hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd, chksum_rd
 
 
-    def ser_send(self, pid, pkg_len, instruction_code, pkg):
-        pid = c_uint8(pid)
-        pkg_len = c_uint16(pkg_len)
-        instruction_code = c_uint8(instruction_code)
-        pkg = c_uint32(pkg)
+    def ser_send(self, **kwargs): 
+        """
+        pid, pkg_len, instr_code, pkg
+        """
+        kwargs['pid'] = c_uint8(kwargs['pid'])
+        kwargs['pkg_len'] = c_uint16(kwargs['pkg_len'])
+        kwargs['instr_code'] = c_uint8(kwargs['instr_code'])
+        if 'pkg' in kwargs:
+            kwargs['pkg'] = c_uint32(kwargs['pkg'])
         with serial.Serial(f'COM{self.port}', self.baud, timeout=1) as ser:
-            send_values = self.send_msg(pid, pkg_len, instruction_code, pkg)
+            send_values = self.send_msg(*list(kwargs.values()))
             print(send_values)
             ser.write(send_values)
-            read_val = ser.read(128)
+            read_val = ser.read(256)
             print(read_val)
-            print(self.read_msg(read_val))
-            print('done.')
+            hdrrd, adrrd, pidrd, p_len_rd, pkgrd, chksumrd = self.read_msg(read_val)
+            print(hex(hdrrd), hex(adrrd), hex(pidrd), hex(p_len_rd), hex(pkgrd), hex(chksumrd))
+            # print('done.')
 
 if __name__ == '__main__':
+    # pid = 0x01
+    # pkg_len = 0x03
+    # instruction_code = 0x0F
+
+    # Check pw
+    # pid = 0x01
+    # pkg_len = 0x07
+    # instruction_code = 0x13
+    # pkg = 0x00
+
+    # Hand shake 
+    # pid = 0x01
+    # pkg_len = 0x03
+    # instruction_code = 0x40
+
+    # Check sensor
     pid = 0x01
-    pkg_len = 0x07
-    instruction_code = 0x13
-    pkg = 0x00
+    pkg_len = 0x03
+    instruction_code = 0x36
 
     fp = R503()
-    fp.ser_send(pid, pkg_len, instruction_code, pkg)
+    #pid, pkg_len, instruction_code, pkg
+    fp.ser_send(pid=pid, pkg_len=pkg_len, instr_code=instruction_code)

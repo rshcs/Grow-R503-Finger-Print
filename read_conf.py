@@ -1,9 +1,9 @@
 import json
 
-with open('confirmation_codes.json', 'r') as jf:
-    jsob = json.load(jf)
 
 def conf_codes():
+    with open('confirmation_codes.json', 'r') as jf:
+        jsob = json.load(jf)
     jsob_len = len(jsob)
     for k in range(jsob_len):
         jsob[int(k)] = jsob[str(k)]
