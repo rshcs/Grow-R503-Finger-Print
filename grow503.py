@@ -12,8 +12,8 @@ pkg_len = c_uint16(0x07)
 instruction_code = c_uint8(0x13)
 passwd = c_uint32(0x00)
 
-def send_msg(hdr, adr, pkgid, pkglen, instcode, pswd):
-    return b_array(hdr, adr, pkgid, pkglen, instcode, pswd) + calc_checksum(pkgid, pkglen, instcode, pswd).value.to_bytes(2, 'big')
+def send_msg(hdr, adr, pkgid, pkglen, instcode, pkg):
+    return b_array(hdr, adr, pkgid, pkglen, instcode, pkg) + calc_checksum(pkgid, pkglen, instcode, pkg).value.to_bytes(2, 'big')
 
 def b_array(*args):
     array_of_bytes = b''
