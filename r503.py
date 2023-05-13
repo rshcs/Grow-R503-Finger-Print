@@ -18,7 +18,6 @@ class R503:
         self.pw = c_uint32(pw)
         self.addr = c_uint32(addr)
 
-
     def send_msg(self, *args): # pkgid, pkglen, instcode, pkg
         return self.b_array(self.HEADER, self.addr, *args) + self.calc_checksum(*args).value.to_bytes(2, 'big')
 
@@ -66,9 +65,11 @@ class R503:
                 print(hex(hdrrd), hex(adrrd), hex(pidrd), hex(p_len_rd), hex(pkgrd), hex(chksumrd))
             # print('done.')
 
+
 if __name__ == '__main__':
     fp = R503()
 
+    #status reg and other details
     # pid = 0x01
     # pkg_len = 0x03
     # instruction_code = 0x0F
@@ -95,7 +96,7 @@ if __name__ == '__main__':
     instruction_code = 0x35
     led_cont = fp.led_control(ctrl=0x04, color=0x06)
     
-    
+
     #pid, pkg_len, instruction_code, pkg
     demo = False
     fp.ser_send(pid=pid, pkg_len=pkg_len, instr_code=instruction_code, pkg=led_cont, demo_mode=demo)
