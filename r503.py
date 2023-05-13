@@ -2,6 +2,7 @@ import serial
 from time import sleep
 from ctypes import c_uint8, c_uint16, c_uint32, sizeof
 from read_conf import conf_codes
+from struct import unpack
 
 
 class R503:
@@ -34,18 +35,24 @@ class R503:
         return c_uint16(chksum)
     
     def read_msg(self, data_stream):
-        hdr_rd = int.from_bytes(data_stream[:2], 'big') # Header
-        adr_rd = int.from_bytes(data_stream[2:6], 'big') # Address
-        pkg_id_rd = data_stream[6] # Package ID
-        pkg_len_rd = int.from_bytes(data_stream[7:9], 'big') # Length
-        conf_code_rd = int.from_bytes(data_stream[9:7+pkg_len_rd], 'big') # Actual package
+        # hdr_rd = int.from_bytes(data_stream[:2], 'big') # Header
+        # adr_rd = int.from_bytes(data_stream[2:6], 'big') # Address
+        # pkg_id_rd = data_stream[6] # Package ID
+        # pkg_len_rd = int.from_bytes(data_stream[7:9], 'big') # Length
+        hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd = unpack('>HIBH', data_stream[:9])
+        conf_code_rd = data_stream[9:7+pkg_len_rd]
         chksum_rd = int.from_bytes(data_stream[-2:], 'big') # Checksum
         return hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd, chksum_rd
 
     def led_control(self, ctrl=0x03, speed=0, color=0x01, cycles=0):
         return ctrl << 24 | speed << 16 | color << 8 | cycles
 
-    def ser_send(self, demo_mode=True, **kwargs): 
+    def read_sys_para(self, data_stream):
+        data_stream = data_stream[1:]
+        data_extracted = unpack('>HHHHIHH', data_stream)
+        return data_extracted
+
+    def ser_send(self, demo_mode=False, **kwargs):
         """
         pid, pkg_len, instr_code, pkg
         """
@@ -61,18 +68,20 @@ class R503:
                 ser.write(send_values)
                 read_val = ser.read(256)
                 print(read_val)
-                hdrrd, adrrd, pidrd, p_len_rd, pkgrd, chksumrd = self.read_msg(read_val)
-                print(hex(hdrrd), hex(adrrd), hex(pidrd), hex(p_len_rd), hex(pkgrd), hex(chksumrd))
+                if read_val != b'':
+                    hdrrd, adrrd, pidrd, p_len_rd, pkgrd, chksumrd = self.read_msg(read_val)
+                    print(hex(hdrrd), hex(adrrd), hex(pidrd), hex(p_len_rd), pkgrd, hex(chksumrd))
+                    # self.read_sys_para(pkgrd)
             # print('done.')
 
 
 if __name__ == '__main__':
-    fp = R503()
+    fp = R503(port=5)
 
     #status reg and other details
-    # pid = 0x01
-    # pkg_len = 0x03
-    # instruction_code = 0x0F
+    pid = 0x01
+    pkg_len = 0x03
+    instruction_code = 0x0F
 
     # Check pw
     # pid = 0x01
@@ -91,14 +100,14 @@ if __name__ == '__main__':
     # instruction_code = 0x36
 
     # led control
-    pid = 0x01
-    pkg_len = 0x07
-    instruction_code = 0x35
-    led_cont = fp.led_control(ctrl=0x04, color=0x06)
+    # pid = 0x01
+    # pkg_len = 0x07
+    # instruction_code = 0x35
+    # led_cont = fp.led_control(ctrl=0x04, color=0x06)
     
 
     #pid, pkg_len, instruction_code, pkg
     demo = False
-    fp.ser_send(pid=pid, pkg_len=pkg_len, instr_code=instruction_code, pkg=led_cont, demo_mode=demo)
+    fp.ser_send(pid=pid, pkg_len=pkg_len, instr_code=instruction_code, demo_mode=demo)
 
     
