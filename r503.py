@@ -7,7 +7,7 @@ from struct import unpack
 
 class R503:
     HEADER = c_uint16(0xEF01)
-    PID_COMMAND = c_uint8(0x01) # Command packet
+    PID_COMMAND = 0x01 # Command packet
     PID_DATA = c_uint8(0x02) # Data packet, data packet must follow command packet or ack packet
     PID_ACK = c_uint8(0x07) # Acknowledge packet
     PID_END = c_uint8(0x08) # End of data packet
@@ -40,14 +40,21 @@ class R503:
         # pkg_id_rd = data_stream[6] # Package ID
         # pkg_len_rd = int.from_bytes(data_stream[7:9], 'big') # Length
         hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd = unpack('>HIBH', data_stream[:9])
-        conf_code_rd = data_stream[9:7+pkg_len_rd]
+        conf_code_rd = data_stream[9:len(data_stream)-2]
         chksum_rd = int.from_bytes(data_stream[-2:], 'big') # Checksum
         return hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd, chksum_rd
 
     def led_control(self, ctrl=0x03, speed=0, color=0x01, cycles=0):
         return ctrl << 24 | speed << 16 | color << 8 | cycles
 
-    def read_sys_para(self, data_stream):
+    def read_sys_para(self):
+        # status reg and other details
+        pkg_len = 0x03
+        instruction_code = 0x0F
+        rd = self.ser_send(pid=self.PID_COMMAND, pkg_len=pkg_len, instr_code=instruction_code)[4]
+        return self.read_sys_para_decode(rd)
+
+    def read_sys_para_decode(self, data_stream):
         data_stream = data_stream[1:]
         data_extracted = unpack('>HHHHIHH', data_stream)
         return data_extracted
@@ -64,24 +71,20 @@ class R503:
         with serial.Serial(f'COM{self.port}', self.baud, timeout=1) as ser:
             send_values = self.send_msg(*list(kwargs.values()))
             print(send_values)
-            if demo_mode == False:
+            if not demo_mode:
                 ser.write(send_values)
                 read_val = ser.read(256)
                 print(read_val)
                 if read_val != b'':
-                    hdrrd, adrrd, pidrd, p_len_rd, pkgrd, chksumrd = self.read_msg(read_val)
-                    print(hex(hdrrd), hex(adrrd), hex(pidrd), hex(p_len_rd), pkgrd, hex(chksumrd))
-                    # self.read_sys_para(pkgrd)
-            # print('done.')
+                    # hdrrd, adrrd, pidrd, p_len_rd, pkgrd, chksumrd = self.read_msg(read_val)
+                    # print(hex(hdrrd), hex(adrrd), hex(pidrd), hex(p_len_rd), pkgrd, hex(chksumrd))
+                    return self.read_msg(read_val)
 
 
 if __name__ == '__main__':
     fp = R503(port=5)
 
-    #status reg and other details
-    pid = 0x01
-    pkg_len = 0x03
-    instruction_code = 0x0F
+
 
     # Check pw
     # pid = 0x01
@@ -108,6 +111,6 @@ if __name__ == '__main__':
 
     #pid, pkg_len, instruction_code, pkg
     demo = False
-    fp.ser_send(pid=pid, pkg_len=pkg_len, instr_code=instruction_code, demo_mode=demo)
-
+    # fp.ser_send(pid=pid, pkg_len=pkg_len, instr_code=instruction_code, demo_mode=demo)
+    print(fp.read_sys_para())
     
