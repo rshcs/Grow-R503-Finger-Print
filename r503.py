@@ -43,8 +43,10 @@ class R503:
         chksum_rd = int.from_bytes(data_stream[-2:], 'big') # Checksum
         return hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd, chksum_rd
 
+    def led_control(self, ctrl=0x03, speed=0, color=0x01, cycles=0):
+        return ctrl << 24 | speed << 16 | color << 8 | cycles
 
-    def ser_send(self, **kwargs): 
+    def ser_send(self, demo_mode=True, **kwargs): 
         """
         pid, pkg_len, instr_code, pkg
         """
@@ -56,14 +58,17 @@ class R503:
         with serial.Serial(f'COM{self.port}', self.baud, timeout=1) as ser:
             send_values = self.send_msg(*list(kwargs.values()))
             print(send_values)
-            ser.write(send_values)
-            read_val = ser.read(256)
-            print(read_val)
-            hdrrd, adrrd, pidrd, p_len_rd, pkgrd, chksumrd = self.read_msg(read_val)
-            print(hex(hdrrd), hex(adrrd), hex(pidrd), hex(p_len_rd), hex(pkgrd), hex(chksumrd))
+            if demo_mode == False:
+                ser.write(send_values)
+                read_val = ser.read(256)
+                print(read_val)
+                hdrrd, adrrd, pidrd, p_len_rd, pkgrd, chksumrd = self.read_msg(read_val)
+                print(hex(hdrrd), hex(adrrd), hex(pidrd), hex(p_len_rd), hex(pkgrd), hex(chksumrd))
             # print('done.')
 
 if __name__ == '__main__':
+    fp = R503()
+
     # pid = 0x01
     # pkg_len = 0x03
     # instruction_code = 0x0F
@@ -80,10 +85,19 @@ if __name__ == '__main__':
     # instruction_code = 0x40
 
     # Check sensor
-    pid = 0x01
-    pkg_len = 0x03
-    instruction_code = 0x36
+    # pid = 0x01
+    # pkg_len = 0x03
+    # instruction_code = 0x36
 
-    fp = R503()
+    # led control
+    pid = 0x01
+    pkg_len = 0x07
+    instruction_code = 0x35
+    led_cont = fp.led_control(ctrl=0x04, color=0x06)
+    
+    
     #pid, pkg_len, instruction_code, pkg
-    fp.ser_send(pid=pid, pkg_len=pkg_len, instr_code=instruction_code)
+    demo = False
+    fp.ser_send(pid=pid, pkg_len=pkg_len, instr_code=instruction_code, pkg=led_cont, demo_mode=demo)
+
+    
