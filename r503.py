@@ -1,29 +1,33 @@
 import serial
 from time import sleep
 from ctypes import c_uint8, c_uint16, c_uint32, sizeof
-from read_conf import conf_codes
 from struct import unpack
+import sys
+import json
 
 
 class R503:
-    HEADER = c_uint16(0xEF01)
-    PID_COMMAND = 0x01  # Command packet
-    PID_DATA = c_uint8(0x02)  # Data packet, data packet must follow command packet or ack packet
-    PID_ACK = c_uint8(0x07)  # Acknowledge packet
-    PID_END = c_uint8(0x08)  # End of data packet
+    header = c_uint16(0xEF01)
+    pid_command = 0x01  # pid_command packet
     
     def __init__(self, port=8, baud=57600, pw=0, addr=0xFFFFFFFF):
-        # self.port = port
-        # self.baud = baud
         self.pw = c_uint32(pw)
         self.addr = c_uint32(addr)
-        self.ser = serial.Serial(f'COM{port}', baud, timeout=1)
+        try:
+            self.ser = serial.Serial(f'COM{port}', baud, timeout=1)
+        except serial.serialutil.SerialException:
+            sys.exit('Serial port not found !')
+
+    def conf_codes(self):
+        with open('confirmation_codes.json', 'r') as jf:
+            jsob = json.load(jf)
+        return jsob
 
     def ser_close(self):
         self.ser.close()
 
-    def send_msg(self, *args): # pkgid, pkglen, instcode, pkg
-        return self.b_array(self.HEADER, self.addr, *args) + self.calc_checksum(*args).value.to_bytes(2, 'big')
+    def send_msg(self, *args):  # pkgid, pkglen, instcode, pkg
+        return self.b_array(self.header, self.addr, *args) + self.calc_checksum(*args).value.to_bytes(2, 'big')
 
     @staticmethod
     def b_array(*args):
@@ -46,35 +50,55 @@ class R503:
     def led_control(self, ctrl=0x03, speed=0, color=0x01, cycles=0):
         """
         ctrl: (int) 1 to 6
-        1: brathing light, 2: flashing light, 3: always on, 4: always off, 5: gradually on, 6: gradually off
+        1: breathing light, 2: flashing light, 3: always on, 4: always off, 5: gradually on, 6: gradually off
         speed: (int) 0 to 255
         color: (int) 0 to 7
         cycles: (int) 0 to 255
-        returns confirmation code
+        returns: confirmation code
         """
         cmd = ctrl << 24 | speed << 16 | color << 8 | cycles
-        rd = self.ser_send(pid=self.PID_COMMAND, pkg_len=0x07, instr_code=0x35, pkg=cmd)
+        rd = self.ser_send(pid=self.pid_command, pkg_len=0x07, instr_code=0x35, pkg=cmd)
+        print(rd[4])
         return rd[4][0]
 
     def read_sys_para(self):
+        """
+        Returns status register and other basic configuration parameters
+
+        returns: (list) status_reg, sys_id_code, finger_lib_size, security_lvl, device_addr, data_packet_size, baud_rate
+        """
         # status reg and other details
-        ds = self.ser_send(pid=self.PID_COMMAND, pkg_len=0x03, instr_code=0x0F)[4]
+        ds = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x0F)[4]
         return unpack('>HHHHIHH', ds[1:])
 
+    def read_sys_para_decode(self):
+        rsp = self.read_sys_para()
+        pkg_length = {0: 32, 1: 64, 2: 128, 3: 256}
+        sys_parameters = {
+            'system_busy': bool(rsp[0] & 8),
+            'matching_finger_found': bool(rsp[0] & 4),
+            'pw_verified': bool(rsp[0] & 2),
+            'valid_image_in_buffer': bool(rsp[0] & 1),
+            'system_id_code': rsp[1],
+            'finger_library_size': rsp[2],
+            'security_level': rsp[3],
+            'device_address': rsp[4],
+            'data_packet_size': pkg_length[rsp[5]],
+            'baud_rate': rsp[6]*9600}
+        return sys_parameters
+
     def check_pw(self, pw=0x00):
-        return self.ser_send(pid=self.PID_COMMAND, pkg_len=0x07, instr_code=0x13, pkg=pw)[4][0]
+        return self.ser_send(pid=self.pid_command, pkg_len=0x07, instr_code=0x13, pkg=pw)[4][0]
 
     def handshake(self):
-        return self.ser_send(pid=self.PID_COMMAND, pkg_len=0x03, instr_code=0x40)[4][0]
+        return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x40)[4][0]
 
     def check_sensor(self):
-        return self.ser_send(pid=self.PID_COMMAND, pkg_len=0x03, instr_code=0x36)[4][0]
-
-
+        return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x36)[4][0]
 
     def confirmation_decode(self, msg):
-        confirmation_codes = conf_codes()
-        return confirmation_codes[msg]
+        confirmation_codes = self.conf_codes()
+        return confirmation_codes[str(msg)]
 
     def ser_send(self, demo_mode=False, **kwargs):
         """
@@ -90,28 +114,26 @@ class R503:
         print(send_values)
         if not demo_mode:
             self.ser.write(send_values)
-            read_val = self.ser.read(256)
+            read_val = self.ser.read(128)
             print(read_val)
-            if read_val != b'':
-                # hdrrd, adrrd, pidrd, p_len_rd, pkgrd, chksumrd = self.read_msg(read_val)
-                # print(hex(hdrrd), hex(adrrd), hex(pidrd), hex(p_len_rd), pkgrd, hex(chksumrd))
+            if read_val == b'':
+                return [30, 30, 30, 30, 30]
+            else:
                 return self.read_msg(read_val)
 
 
 if __name__ == '__main__':
     fp = R503(port=5)
 
-    # led control
-    # pid = 0x01
-    # pkg_len = 0x07
-    # instruction_code = 0x35
-    # led_cont = fp.led_control(ctrl=0x04, color=0x06)
-    
-
     #pid, pkg_len, instruction_code, pkg
     demo = False
     # fp.ser_send(pid=pid, pkg_len=pkg_len, instr_code=instruction_code, demo_mode=demo)
-    msg = fp.led_control(ctrl=2, color=7, speed=255, cycles=3)
-    print(fp.confirmation_decode(msg))
+    # msg = fp.led_control(ctrl=2, color=3, speed=255, cycles=3)
+    msg = fp.read_sys_para_decode()
+    for k, v in msg.items():
+        print(k, ": ", v)
+    # print(fp.confirmation_decode(msg))
     fp.ser_close()
+
+    # print(fp.conf_codes())
     
