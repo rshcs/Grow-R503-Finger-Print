@@ -72,6 +72,10 @@ class R503:
         return unpack('>HHHHIHH', ds[1:])
 
     def read_sys_para_decode(self):
+        """
+        Return decoded system parameters in more human-readable way
+        returns: (dictionary) system parameters
+        """
         rsp = self.read_sys_para()
         pkg_length = {0: 32, 1: 64, 2: 128, 3: 256}
         sys_parameters = {
@@ -82,7 +86,7 @@ class R503:
             'system_id_code': rsp[1],
             'finger_library_size': rsp[2],
             'security_level': rsp[3],
-            'device_address': rsp[4],
+            'device_address': hex(rsp[4]),
             'data_packet_size': pkg_length[rsp[5]],
             'baud_rate': rsp[6]*9600}
         return sys_parameters
@@ -131,7 +135,7 @@ if __name__ == '__main__':
     # msg = fp.led_control(ctrl=2, color=3, speed=255, cycles=3)
     msg = fp.read_sys_para_decode()
     for k, v in msg.items():
-        print(k, ": ", v)
+        print(k, ": ", v, ' - ', type(v))
     # print(fp.confirmation_decode(msg))
     fp.ser_close()
 
