@@ -104,6 +104,12 @@ class R503:
         confirmation_codes = self.conf_codes()
         return confirmation_codes[str(msg)]
 
+    def gen_img(self):
+        """
+        Detect a finger and store it in image_buffer
+        """
+        return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x01)[4][0]
+
     def ser_send(self, demo_mode=False, **kwargs):
         """
         pid, pkg_len, instr_code, pkg
@@ -121,7 +127,7 @@ class R503:
             read_val = self.ser.read(128)
             print(read_val)
             if read_val == b'':
-                return [30, 30, 30, 30, 30]
+                sys.exit('Respond not received from the module')
             else:
                 return self.read_msg(read_val)
 
@@ -130,14 +136,15 @@ if __name__ == '__main__':
     fp = R503(port=5)
 
     #pid, pkg_len, instruction_code, pkg
-    demo = False
-    # fp.ser_send(pid=pid, pkg_len=pkg_len, instr_code=instruction_code, demo_mode=demo)
+    # demo = False
+    # # fp.ser_send(pid=pid, pkg_len=pkg_len, instr_code=instruction_code, demo_mode=demo)
     # msg = fp.led_control(ctrl=2, color=3, speed=255, cycles=3)
-    msg = fp.read_sys_para_decode()
-    for k, v in msg.items():
-        print(k, ": ", v, ' - ', type(v))
-    # print(fp.confirmation_decode(msg))
-    fp.ser_close()
+    # msg = fp.read_sys_para_decode()
+    # for k, v in msg.items():
+    #     print(k, ": ", v, ' - ')
+
 
     # print(fp.conf_codes())
-    
+
+    # print(fp.gen_img())
+    fp.ser_close()
