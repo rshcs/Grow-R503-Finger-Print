@@ -110,6 +110,23 @@ class R503:
         """
         return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x01)[4][0]
 
+    def img2tz(self, buffer_id=1):
+        """
+        Generate character file from the original image in Image Buffer and store the file in CharBuffer 1 or 2
+        parameter: (int) buffer_id, 1 or 2
+        returns: (int) confirmation code
+        """
+        return self.ser_send(pid=self.pid_command, pkg_len=0x04, instr_code=0x02, pkg=buffer_id)[4][0]
+
+    def reg_model(self):
+        """
+        Combine info of character files in CharBuffer 1 and 2 and generate a template which is stored back in both
+        CharBuffer 1 and 2
+        input parameters: None
+        returns: (int) confirmation code
+        """
+        return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x05)[4][0]
+
     def ser_send(self, demo_mode=False, **kwargs):
         """
         pid, pkg_len, instr_code, pkg
@@ -139,9 +156,9 @@ if __name__ == '__main__':
     # demo = False
     # # fp.ser_send(pid=pid, pkg_len=pkg_len, instr_code=instruction_code, demo_mode=demo)
     # msg = fp.led_control(ctrl=2, color=3, speed=255, cycles=3)
-    # msg = fp.read_sys_para_decode()
-    # for k, v in msg.items():
-    #     print(k, ": ", v, ' - ')
+    msg = fp.read_sys_para_decode()
+    for k, v in msg.items():
+        print(k, ": ", v)
 
 
     # print(fp.conf_codes())
