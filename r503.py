@@ -1,7 +1,7 @@
 import serial
 from time import sleep
 from ctypes import c_uint8, c_uint16, c_uint32, sizeof
-from struct import unpack
+from struct import pack, unpack
 import sys
 import json
 
@@ -33,7 +33,10 @@ class R503:
     def b_array(*args):
         array_of_bytes = b''
         for arg in args:
-            array_of_bytes += arg.value.to_bytes(sizeof(arg), 'big')
+            if isinstance(arg, bytes):
+                array_of_bytes += arg
+            else:
+                array_of_bytes += arg.value.to_bytes(sizeof(arg), 'big')
         return array_of_bytes
 
     def calc_checksum(self, *args):
@@ -56,7 +59,8 @@ class R503:
         cycles: (int) 0 to 255
         returns: confirmation code
         """
-        cmd = ctrl << 24 | speed << 16 | color << 8 | cycles
+        # cmd = ctrl << 24 | speed << 16 | color << 8 | cycles
+        cmd = pack('>BBBB', ctrl, speed, color, cycles)
         rd = self.ser_send(pid=self.pid_command, pkg_len=0x07, instr_code=0x35, pkg=cmd)
         print(rd[4])
         return rd[4][0]
@@ -104,11 +108,17 @@ class R503:
         confirmation_codes = self.conf_codes()
         return confirmation_codes[str(msg)]
 
-    def gen_img(self):
+    def get_img(self):
         """
         Detect a finger and store it in image_buffer
         """
         return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x01)[4][0]
+
+    def get_img_ex(self):
+        """
+        Detect a finger and store it in image_buffer return 0x07 if image poor quality
+        """
+        return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x28)[4][0]
 
     def img2tz(self, buffer_id=1):
         """
@@ -127,6 +137,13 @@ class R503:
         """
         return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x05)[4][0]
 
+    def store(self, buffer_id, page_id):
+        """
+        Store the template of buffer1 or buffer2 on the flash library
+        """
+        package = pack('>BH', buffer_id, page_id)
+        return self.ser_send(pid=self.pid_command, pkg_len=0x06, instr_code=0x06, pkg=package, demo_mode=True)[4][0]
+
     def ser_send(self, demo_mode=False, **kwargs):
         """
         pid, pkg_len, instr_code, pkg
@@ -134,8 +151,8 @@ class R503:
         kwargs['pid'] = c_uint8(kwargs['pid'])
         kwargs['pkg_len'] = c_uint16(kwargs['pkg_len'])
         kwargs['instr_code'] = c_uint8(kwargs['instr_code'])
-        if 'pkg' in kwargs:
-            kwargs['pkg'] = c_uint32(kwargs['pkg'])
+        # if 'pkg' in kwargs:
+        #     kwargs['pkg'] = c_uint32(kwargs['pkg'])
 
         send_values = self.send_msg(*list(kwargs.values()))
         print(send_values)
@@ -150,17 +167,17 @@ class R503:
 
 
 if __name__ == '__main__':
-    fp = R503(port=5)
+    fp = R503()
 
     #pid, pkg_len, instruction_code, pkg
     # demo = False
     # # fp.ser_send(pid=pid, pkg_len=pkg_len, instr_code=instruction_code, demo_mode=demo)
     # msg = fp.led_control(ctrl=2, color=3, speed=255, cycles=3)
-    msg = fp.read_sys_para_decode()
-    for k, v in msg.items():
-        print(k, ": ", v)
+    # msg = fp.read_sys_para_decode()
+    # for k, v in msg.items():
+    #     print(k, ": ", v)
 
-
+    fp.store(buffer_id=1, page_id=1)
     # print(fp.conf_codes())
 
     # print(fp.gen_img())
