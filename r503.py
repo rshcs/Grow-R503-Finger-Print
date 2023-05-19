@@ -1,6 +1,5 @@
 import serial
 from time import sleep
-from ctypes import c_uint8, c_uint16, c_uint32, sizeof
 from struct import pack, unpack
 import sys
 import json
@@ -28,21 +27,6 @@ class R503:
 
     def send_msg(self, *args):  # pkgid, pkglen, instcode, pkg
         return self.b_array(self.header, self.addr, *args) + self.calc_checksum(*args).value.to_bytes(2, 'big')
-
-    @staticmethod
-    def b_array(*args):
-        array_of_bytes = b''
-        for arg in args:
-            if isinstance(arg, bytes):
-                array_of_bytes += arg
-            else:
-                array_of_bytes += arg.value.to_bytes(sizeof(arg), 'big')
-        return array_of_bytes
-
-    def calc_checksum(self, *args):
-        whole_pkg = self.b_array(*args)
-        chksum = sum(whole_pkg)
-        return c_uint16(chksum)
     
     def read_msg(self, data_stream):
         hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd = unpack('>HIBH', data_stream[:9])
@@ -61,14 +45,13 @@ class R503:
         """
         # cmd = ctrl << 24 | speed << 16 | color << 8 | cycles
         cmd = pack('>BBBB', ctrl, speed, color, cycles)
-        rd = self.ser_send(pid=self.pid_command, pkg_len=0x07, instr_code=0x35, pkg=cmd, demo_mode=True)
+        rd = self.ser_send(pid=self.pid_command, pkg_len=0x07, instr_code=0x35, pkg=cmd)
         print(rd[4])
         return rd[4][0]
 
     def read_sys_para(self):
         """
-        Returns status register and other basic configuration parameters
-
+        Status register and other basic configuration parameters
         returns: (list) status_reg, sys_id_code, finger_lib_size, security_lvl, device_addr, data_packet_size, baud_rate
         """
         # status reg and other details
@@ -77,7 +60,7 @@ class R503:
 
     def read_sys_para_decode(self):
         """
-        Return decoded system parameters in more human-readable way
+        Get decoded system parameters in more human-readable way
         returns: (dictionary) system parameters
         """
         rsp = self.read_sys_para()
@@ -96,7 +79,7 @@ class R503:
         return sys_parameters
 
     def check_pw(self, pw=0x00):
-        return self.ser_send(pid=self.pid_command, pkg_len=0x07, instr_code=0x13, pkg=pack('>I', pw), demo_mode=True)[4][0]
+        return self.ser_send(pid=self.pid_command, pkg_len=0x07, instr_code=0x13, pkg=pack('>I', pw))[4][0]
 
     def handshake(self):
         return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x40)[4][0]
@@ -144,18 +127,13 @@ class R503:
         package = pack('>BH', buffer_id, page_id)
         return self.ser_send(pid=self.pid_command, pkg_len=0x06, instr_code=0x06, pkg=package, demo_mode=True)[4][0]
 
-    def ser_send(self, demo_mode=False, **kwargs):
+    def ser_send(self, pid, pkg_len, instr_code, pkg=None, demo_mode=False):
         """
         pid, pkg_len, instr_code, pkg
         """
-        # kwargs['pid'] = c_uint8(kwargs['pid'])
-        # kwargs['pkg_len'] = c_uint16(kwargs['pkg_len'])
-        # kwargs['instr_code'] = c_uint8(kwargs['instr_code'])
-        # if 'pkg' in kwargs:
-        #     kwargs['pkg'] = c_uint32(kwargs['pkg'])
-
-        # send_values = self.send_msg(*list(kwargs.values()))
-        send_values = pack('>BHB', kwargs['pid'], kwargs['pkg_len'], kwargs['instr_code']) + kwargs['pkg']
+        send_values = pack('>BHB', pid, pkg_len, instr_code)
+        if pkg is not None:
+            send_values += pkg
         check_sum = sum(send_values)
         send_values = self.header + self.addr + send_values + pack('>H', check_sum)
         print(send_values)
@@ -173,15 +151,12 @@ if __name__ == '__main__':
     fp = R503(port=5)
 
     #pid, pkg_len, instruction_code, pkg
-    # demo = False
-    # # fp.ser_send(pid=pid, pkg_len=pkg_len, instr_code=instruction_code, demo_mode=demo)
-    # msg = fp.led_control(ctrl=2, color=3, speed=255, cycles=3)
+
     # msg = fp.read_sys_para_decode()
     # for k, v in msg.items():
     #     print(k, ": ", v)
 
     # fp.store(buffer_id=1, page_id=1)
     # print(fp.conf_codes())
-    fp.check_pw()
-    # print(fp.gen_img())
+
     fp.ser_close()
