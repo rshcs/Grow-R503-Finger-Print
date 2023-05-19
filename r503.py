@@ -7,12 +7,12 @@ import json
 
 
 class R503:
-    header = c_uint16(0xEF01)
+    header = pack('>H', 0xEF01)
     pid_command = 0x01  # pid_command packet
     
     def __init__(self, port=8, baud=57600, pw=0, addr=0xFFFFFFFF):
-        self.pw = c_uint32(pw)
-        self.addr = c_uint32(addr)
+        self.pw = pack('>I', pw)
+        self.addr = pack('>I', addr)
         try:
             self.ser = serial.Serial(f'COM{port}', baud, timeout=1)
         except serial.serialutil.SerialException:
@@ -61,7 +61,7 @@ class R503:
         """
         # cmd = ctrl << 24 | speed << 16 | color << 8 | cycles
         cmd = pack('>BBBB', ctrl, speed, color, cycles)
-        rd = self.ser_send(pid=self.pid_command, pkg_len=0x07, instr_code=0x35, pkg=cmd)
+        rd = self.ser_send(pid=self.pid_command, pkg_len=0x07, instr_code=0x35, pkg=cmd, demo_mode=True)
         print(rd[4])
         return rd[4][0]
 
@@ -96,7 +96,7 @@ class R503:
         return sys_parameters
 
     def check_pw(self, pw=0x00):
-        return self.ser_send(pid=self.pid_command, pkg_len=0x07, instr_code=0x13, pkg=pw)[4][0]
+        return self.ser_send(pid=self.pid_command, pkg_len=0x07, instr_code=0x13, pkg=pack('>I', pw), demo_mode=True)[4][0]
 
     def handshake(self):
         return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x40)[4][0]
@@ -126,7 +126,7 @@ class R503:
         parameter: (int) buffer_id, 1 or 2
         returns: (int) confirmation code
         """
-        return self.ser_send(pid=self.pid_command, pkg_len=0x04, instr_code=0x02, pkg=buffer_id)[4][0]
+        return self.ser_send(pid=self.pid_command, pkg_len=0x04, instr_code=0x02, pkg=pack('>B', buffer_id))[4][0]
 
     def reg_model(self):
         """
@@ -148,13 +148,16 @@ class R503:
         """
         pid, pkg_len, instr_code, pkg
         """
-        kwargs['pid'] = c_uint8(kwargs['pid'])
-        kwargs['pkg_len'] = c_uint16(kwargs['pkg_len'])
-        kwargs['instr_code'] = c_uint8(kwargs['instr_code'])
+        # kwargs['pid'] = c_uint8(kwargs['pid'])
+        # kwargs['pkg_len'] = c_uint16(kwargs['pkg_len'])
+        # kwargs['instr_code'] = c_uint8(kwargs['instr_code'])
         # if 'pkg' in kwargs:
         #     kwargs['pkg'] = c_uint32(kwargs['pkg'])
 
-        send_values = self.send_msg(*list(kwargs.values()))
+        # send_values = self.send_msg(*list(kwargs.values()))
+        send_values = pack('>BHB', kwargs['pid'], kwargs['pkg_len'], kwargs['instr_code']) + kwargs['pkg']
+        check_sum = sum(send_values)
+        send_values = self.header + self.addr + send_values + pack('>H', check_sum)
         print(send_values)
         if not demo_mode:
             self.ser.write(send_values)
@@ -167,7 +170,7 @@ class R503:
 
 
 if __name__ == '__main__':
-    fp = R503()
+    fp = R503(port=5)
 
     #pid, pkg_len, instruction_code, pkg
     # demo = False
@@ -177,8 +180,8 @@ if __name__ == '__main__':
     # for k, v in msg.items():
     #     print(k, ": ", v)
 
-    fp.store(buffer_id=1, page_id=1)
+    # fp.store(buffer_id=1, page_id=1)
     # print(fp.conf_codes())
-
+    fp.check_pw()
     # print(fp.gen_img())
     fp.ser_close()
