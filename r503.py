@@ -126,7 +126,8 @@ class R503:
         return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x0d)[4][0]
 
     def read_valid_template_num(self):
-        return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x1d)[4][0]
+        return unpack('>H', self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x1d)[4][1:])
+
     # def get_fingerprint(self):
     #     # self.led_control()
     #     t1 = time()
@@ -135,6 +136,13 @@ class R503:
     #     for k, v in self.read_sys_para_decode().items():
     #         print(k, ": ", v)
     #     # self.led_control(ctrl=4)
+
+    def auto_enroll(self, location_id=0, duplicate_id=1, duplicate_fp=1, ret_status=1, finger_leave=1):
+        """
+        Automatic registration a template
+        """
+        package = pack('>BBBBB', location_id, duplicate_id, duplicate_fp, ret_status, finger_leave)
+        return self.ser_send(pid=self.pid_command, pkg_len=0x08, instr_code=0x31, pkg=package)[4][0]
 
     def read_prod_info(self):
         info = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x3c)[4]
@@ -181,6 +189,7 @@ if __name__ == '__main__':
 
     # for k, v in fp.read_sys_para_decode().items():
     #     print(k, v)
-    print(fp.read_prod_info_decode())
+    # fp.auto_enroll()
+    print(fp.read_valid_template_num())
     # fp.get_fingerprint()
     fp.ser_close()
