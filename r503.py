@@ -4,6 +4,7 @@ from struct import pack, unpack
 import sys
 import json
 
+
 class R503:
     header = pack('>H', 0xEF01)
     pid_command = 0x01  # pid_command packet
@@ -138,12 +139,19 @@ class R503:
     #         print(k, ": ", v)
     #     # self.led_control(ctrl=4)
 
-    def auto_enroll(self, location_id=0, duplicate_id=1, duplicate_fp=1, ret_status=1, finger_leave=1):
+    def auto_enroll(self, location_id=34, duplicate_id=1, duplicate_fp=1, ret_status=1, finger_leave=1):
         """
         Automatic registration a template
         """
         package = pack('>BBBBB', location_id, duplicate_id, duplicate_fp, ret_status, finger_leave)
         return self.ser_send(pid=self.pid_command, pkg_len=0x08, instr_code=0x31, pkg=package)[4][0]
+
+    def auto_identify(self, security_lvl=3, start_pos=0, num_of_searches=199, ret_key_step=1, num_of_fp_errors=10):
+        """
+        Search and verify a fingerprint
+        """
+        package = pack('>BBBBB', security_lvl, start_pos, num_of_searches, ret_key_step, num_of_fp_errors)
+        return (self.ser_send(pid=self.pid_command, pkg_len=0x08, instr_code=0x32, pkg=package, timeout=10)[4][-2:]).hex(sep=' ')
 
     def read_prod_info(self):
         info = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x3c)[4]
@@ -164,7 +172,7 @@ class R503:
             'fp database size': unpack('>H', inf[8])[0]
         }
 
-    def ser_send(self, pid, pkg_len, instr_code, pkg=None, demo_mode=False):
+    def ser_send(self, pid, pkg_len, instr_code, pkg=None, demo_mode=False, timeout=1):
         """
         pid, pkg_len, instr_code, pkg
         """
@@ -175,9 +183,8 @@ class R503:
         send_values = self.header + self.addr + send_values + pack('>H', check_sum)
         print(send_values.hex(sep=' '))
         if not demo_mode:
+            self.ser.timeout = timeout
             self.ser.write(send_values)
-            sleep(.01)
-            print('inwait ', self.ser.in_waiting)
             read_val = self.ser.read(128)
             print(read_val.hex(sep=' '))
             if read_val == b'':
@@ -185,27 +192,30 @@ class R503:
             else:
                 return self.read_msg(read_val)
 
-    def ser_read(self, read_buff=128, timeout=1):
-        t1 = time()
-        read_msg = bytearray([])
-        while time() - t1 < timeout:
-            if self.ser.in_waiting > 8:
-                read_val = self.ser.read(read_buff)
-                print(read_val.hex(sep=' '))
-                read_msg += read_val
-        if read_msg == b'':
-            sys.exit('Respond not received from the module')
-        else:
-            return self.read_msg(read_msg)
+    # def serial_read(self, read_buff=128, timeout=1):
+    #     t1 = time()
+    #     read_msg = bytearray([])
+    #     while time() - t1 < timeout:
+    #         if self.ser.in_waiting > 8:
+    #             read_val = self.ser.read(read_buff)
+    #             print(read_val.hex(sep=' '))
+    #             read_msg += read_val
+    #     if read_msg == b'':
+    #         sys.exit('Respond not received from the module')
+    #     else:
+    #         return self.read_msg(read_msg)
 
 
 if __name__ == '__main__':
-    fp = R503(port=5)
+    fp = R503()
 
 
     # for k, v in fp.read_sys_para_decode().items():
     #     print(k, v)
-    ## fp.auto_enroll()
-    print(fp.read_valid_template_num())
-    # fp.get_fingerprint()
+    # msg = fp.auto_enroll()
+    # msg = fp.read_valid_template_num()
+
+    msg = fp.auto_identify()
+    print(msg)
+    print('end.')
     fp.ser_close()
