@@ -27,7 +27,8 @@ class R503:
     def read_msg(self, data_stream):
         hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd = unpack('>HIBH', data_stream[:9])
         conf_code_rd = data_stream[9:len(data_stream)-2]
-        chksum_rd = int.from_bytes(data_stream[-2:], 'big')  # Checksum
+        chksum_rd = unpack('>H', data_stream[-2:])
+        # chksum_rd = int.from_bytes(data_stream[-2:], 'big')  # Checksum
         return hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd, chksum_rd
 
     def led_control(self, ctrl=0x03, speed=0, color=0x01, cycles=0):
@@ -175,12 +176,27 @@ class R503:
         print(send_values.hex(sep=' '))
         if not demo_mode:
             self.ser.write(send_values)
+            sleep(.01)
+            print('inwait ', self.ser.in_waiting)
             read_val = self.ser.read(128)
             print(read_val.hex(sep=' '))
             if read_val == b'':
                 sys.exit('Respond not received from the module')
             else:
                 return self.read_msg(read_val)
+
+    def ser_read(self, read_buff=128, timeout=1):
+        t1 = time()
+        read_msg = bytearray([])
+        while time() - t1 < timeout:
+            if self.ser.in_waiting > 8:
+                read_val = self.ser.read(read_buff)
+                print(read_val.hex(sep=' '))
+                read_msg += read_val
+        if read_msg == b'':
+            sys.exit('Respond not received from the module')
+        else:
+            return self.read_msg(read_msg)
 
 
 if __name__ == '__main__':
@@ -189,7 +205,7 @@ if __name__ == '__main__':
 
     # for k, v in fp.read_sys_para_decode().items():
     #     print(k, v)
-    # fp.auto_enroll()
+    ## fp.auto_enroll()
     print(fp.read_valid_template_num())
     # fp.get_fingerprint()
     fp.ser_close()
