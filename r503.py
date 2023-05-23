@@ -26,11 +26,10 @@ class R503:
         self.ser.close()
     
     def read_msg(self, data_stream):
-        hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd = unpack('>HIBH', data_stream[:9])
-        conf_code_rd = data_stream[9:len(data_stream)-2]
+        hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd = unpack('>HIBHB', data_stream[:10])
+        pkg = data_stream[10:len(data_stream)-2]
         chksum_rd = unpack('>H', data_stream[-2:])
-        # chksum_rd = int.from_bytes(data_stream[-2:], 'big')  # Checksum
-        return hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd, chksum_rd
+        return hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd, pkg, chksum_rd
 
     def led_control(self, ctrl=0x03, speed=0, color=0x01, cycles=0):
         """
@@ -125,10 +124,10 @@ class R503:
         return self.ser_send(pid=self.pid_command, pkg_len=0x06, instr_code=0x06, pkg=package, demo_mode=True)[4][0]
 
     def empty_finger_lib(self):
-        return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x0d)[4][0]
+        return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x0d)[4]
 
     def read_valid_template_num(self):
-        return unpack('>H', self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x1d)[4][1:])
+        return unpack('>H', self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x1d)[5])
 
     # def get_fingerprint(self):
     #     # self.led_control()
@@ -139,22 +138,26 @@ class R503:
     #         print(k, ": ", v)
     #     # self.led_control(ctrl=4)
 
+    def read_index_table(self, index_page=0):
+        index_page = pack('>B', index_page)
+        return (self.ser_send(pid=self.pid_command, pkg_len=0x04, instr_code=0x1f, pkg=index_page)[5]).hex(sep=' ')
+
     def auto_enroll(self, location_id=34, duplicate_id=1, duplicate_fp=1, ret_status=1, finger_leave=1):
         """
         Automatic registration a template
         """
         package = pack('>BBBBB', location_id, duplicate_id, duplicate_fp, ret_status, finger_leave)
-        return self.ser_send(pid=self.pid_command, pkg_len=0x08, instr_code=0x31, pkg=package)[4][0]
+        return self.ser_send(pid=self.pid_command, pkg_len=0x08, instr_code=0x31, pkg=package)[4]
 
     def auto_identify(self, security_lvl=3, start_pos=0, num_of_searches=199, ret_key_step=1, num_of_fp_errors=10):
         """
         Search and verify a fingerprint
         """
         package = pack('>BBBBB', security_lvl, start_pos, num_of_searches, ret_key_step, num_of_fp_errors)
-        return (self.ser_send(pid=self.pid_command, pkg_len=0x08, instr_code=0x32, pkg=package, timeout=10)[4][-2:]).hex(sep=' ')
+        return (self.ser_send(pid=self.pid_command, pkg_len=0x08, instr_code=0x32, pkg=package, timeout=10)[5]).hex(sep=' ')
 
     def read_prod_info(self):
-        info = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x3c)[4]
+        info = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x3c)[5]
         return info[1:17], info[17:21], info[21:29], info[29:31], info[31:39], info[39:41], info[41:43], info[43:45], info[45:47]
 
     def read_prod_info_decode(self):
@@ -214,8 +217,8 @@ if __name__ == '__main__':
     #     print(k, v)
     # msg = fp.auto_enroll()
     # msg = fp.read_valid_template_num()
-
-    msg = fp.auto_identify()
+    msg = fp.read_index_table()
+    # msg = fp.auto_identify()
     print(msg)
     print('end.')
     fp.ser_close()
