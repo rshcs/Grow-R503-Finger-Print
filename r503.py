@@ -40,18 +40,17 @@ class R503:
         cycles: (int) 0 to 255
         returns: confirmation code
         """
-        # cmd = ctrl << 24 | speed << 16 | color << 8 | cycles
         cmd = pack('>BBBB', ctrl, speed, color, cycles)
         rd = self.ser_send(pid=self.pid_command, pkg_len=0x07, instr_code=0x35, pkg=cmd)
-        return rd[4]
+        return -1 if rd == -1 else rd[4]
 
     def read_sys_para(self):
         """
         Status register and other basic configuration parameters
         returns: (list) status_reg, sys_id_code, finger_lib_size, security_lvl, device_addr, data_packet_size, baud_rate
         """
-        # status reg and other details
-        return unpack('>HHHHIHH', self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x0F)[5])
+        read_pkg = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x0F)
+        return -1 if read_pkg == -1 else unpack('>HHHHIHH', read_pkg[5])
 
     def read_sys_para_decode(self):
         """
@@ -59,6 +58,8 @@ class R503:
         returns: (dictionary) system parameters
         """
         rsp = self.read_sys_para()
+        if rsp == -1:
+            return -1
         pkg_length = {0: 32, 1: 64, 2: 128, 3: 256}
         return {
             'system_busy': bool(rsp[0] & 1),
@@ -90,13 +91,15 @@ class R503:
         """
         Detect a finger and store it in image_buffer
         """
-        return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x01)[4]
+        read_conf_code = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x01)
+        return -1 if read_conf_code == -1 else read_conf_code[4]
 
     def get_img_ex(self):
         """
         Detect a finger and store it in image_buffer return 0x07 if image poor quality
         """
-        return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x28)[4]
+        read_conf_code = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x28)
+        return -1 if read_conf_code == -1 else read_conf_code[4]
 
     def img2tz(self, buffer_id=1):
         """
@@ -104,7 +107,8 @@ class R503:
         parameter: (int) buffer_id, 1 or 2
         returns: (int) confirmation code
         """
-        return self.ser_send(pid=self.pid_command, pkg_len=0x04, instr_code=0x02, pkg=pack('>B', buffer_id))[4]
+        read_conf_code = self.ser_send(pid=self.pid_command, pkg_len=0x04, instr_code=0x02, pkg=pack('>B', buffer_id))
+        return -1 if read_conf_code == -1 else read_conf_code[4]
 
     def reg_model(self):
         """
@@ -113,29 +117,24 @@ class R503:
         input parameters: None
         returns: (int) confirmation code
         """
-        return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x05)[4]
+        read_conf_code = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x05)
+        return -1 if read_conf_code == -1 else read_conf_code[4]
 
     def store(self, buffer_id, page_id):
         """
         Store the template of buffer1 or buffer2 on the flash library
         """
         package = pack('>BH', buffer_id, page_id)
-        return self.ser_send(pid=self.pid_command, pkg_len=0x06, instr_code=0x06, pkg=package, demo_mode=True)[4]
+        read_conf_code = self.ser_send(pid=self.pid_command, pkg_len=0x06, instr_code=0x06, pkg=package, demo_mode=True)
+        return -1 if read_conf_code == -1 else read_conf_code[4]
 
     def empty_finger_lib(self):
-        return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x0d)[4]
+        read_conf_code = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x0d)
+        return -1 if read_conf_code == -1 else read_conf_code[4]
 
     def read_valid_template_num(self):
-        return unpack('>H', self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x1d)[5])
-
-    # def get_fingerprint(self):
-    #     # self.led_control()
-    #     t1 = time()
-    #     img_buf = self.get_img_ex()
-    #     print('success' if img_buf == 0 else 'fail')
-    #     for k, v in self.read_sys_para_decode().items():
-    #         print(k, ": ", v)
-    #     # self.led_control(ctrl=4)
+        read_pkg = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x1d)
+        return -1 if read_pkg == -1 else unpack('>H', read_pkg[5])
 
     def read_index_table(self, index_page=0):
         """
@@ -144,7 +143,10 @@ class R503:
         returns: (list) index which fingerprints saved already
         """
         index_page = pack('>B', index_page)
-        temp = self.ser_send(pid=self.pid_command, pkg_len=0x04, instr_code=0x1f, pkg=index_page)[5]
+        temp = self.ser_send(pid=self.pid_command, pkg_len=0x04, instr_code=0x1f, pkg=index_page)
+        if temp == -1:
+            return -1
+        temp = temp[5]
         temp_indx = []
         for n, lv in enumerate(temp):
             temp_indx.extend(8 * n + i for i in range(8) if (lv >> i) & 1)
@@ -155,21 +157,30 @@ class R503:
         Automatic registration a template
         """
         package = pack('>BBBBB', location_id, duplicate_id, duplicate_fp, ret_status, finger_leave)
-        return self.ser_send(pid=self.pid_command, pkg_len=0x08, instr_code=0x31, pkg=package)[4]
+        read_pkg = self.ser_send(pid=self.pid_command, pkg_len=0x08, instr_code=0x31, pkg=package)
+        if read_pkg == -1:
+            return -1
+        return read_pkg[4]
 
     def auto_identify(self, security_lvl=3, start_pos=0, end_pos=199, ret_key_step=0, num_of_fp_errors=1):
         """
         Search and verify a fingerprint
         """
         package = pack('>BBBBB', security_lvl, start_pos, end_pos, ret_key_step, num_of_fp_errors)
-        return (self.ser_send(pid=self.pid_command, pkg_len=0x08, instr_code=0x32, pkg=package, timeout=10)[5]).hex(sep=' ')
+        read_pkg = self.ser_send(pid=self.pid_command, pkg_len=0x08, instr_code=0x32, pkg=package, timeout=10)
+        return -1 if read_pkg == -1 else read_pkg[5].hex(sep=' ')
 
     def read_prod_info(self):
-        info = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x3c)[5]
+        info = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x3c)
+        if info == -1:
+            return -1
+        info = info[5]
         return info[:16], info[16:20], info[20:28], info[28:30], info[30:38], info[38:40], info[40:42], info[42:44], info[44:46]
 
     def read_prod_info_decode(self):
         inf = self.read_prod_info()
+        if inf == -1:
+            return -1
         return {
             'module type': inf[0].decode('ascii').replace('\x00', ''),
             'batch number': inf[1].decode('ascii'),
@@ -198,23 +209,7 @@ class R503:
             self.ser.write(send_values)
             read_val = self.ser.read(128)
             print(read_val.hex(sep=' '))
-            if read_val == b'':
-                sys.exit('Respond not received from the module')
-            else:
-                return self.read_msg(read_val)
-
-    # def serial_read(self, read_buff=128, timeout=1):
-    #     t1 = time()
-    #     read_msg = bytearray([])
-    #     while time() - t1 < timeout:
-    #         if self.ser.in_waiting > 8:
-    #             read_val = self.ser.read(read_buff)
-    #             print(read_val.hex(sep=' '))
-    #             read_msg += read_val
-    #     if read_msg == b'':
-    #         sys.exit('Respond not received from the module')
-    #     else:
-    #         return self.read_msg(read_msg)
+            return -1 if read_val == b'' else self.read_msg(read_val)
 
 
 if __name__ == '__main__':
