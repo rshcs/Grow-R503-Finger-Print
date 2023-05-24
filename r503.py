@@ -165,10 +165,14 @@ class R503:
     def auto_identify(self, security_lvl=3, start_pos=0, end_pos=199, ret_key_step=0, num_of_fp_errors=1):
         """
         Search and verify a fingerprint
+        return: (tuple) fp store location, match score
         """
         package = pack('>BBBBB', security_lvl, start_pos, end_pos, ret_key_step, num_of_fp_errors)
         read_pkg = self.ser_send(pid=self.pid_command, pkg_len=0x08, instr_code=0x32, pkg=package, timeout=10)
-        return -1 if read_pkg == -1 else read_pkg[5].hex(sep=' ')
+        if read_pkg == -1:
+            return -1
+        _, position, match_score = unpack('>BHH', read_pkg[5])
+        return position, match_score
 
     def read_prod_info(self):
         info = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x3c)
@@ -220,7 +224,6 @@ if __name__ == '__main__':
     #     print(k, v)
     # msg = fp.auto_enroll()
     # msg = fp.read_valid_template_num()
-
 
     print('end.')
     fp.ser_close()
