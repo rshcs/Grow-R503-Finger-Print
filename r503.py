@@ -132,6 +132,10 @@ class R503:
         read_conf_code = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x0d)
         return -1 if read_conf_code == -1 else read_conf_code[4]
 
+    def get_image_ex(self):
+        read_conf_code = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x28)
+        return -1 if read_conf_code == -1 else read_conf_code[4]
+
     def read_valid_template_num(self):
         read_pkg = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x1d)
         return -1 if read_pkg == -1 else unpack('>H', read_pkg[5])
@@ -152,7 +156,7 @@ class R503:
             temp_indx.extend(8 * n + i for i in range(8) if (lv >> i) & 1)
         return temp_indx
 
-    def auto_enroll(self, location_id=34, duplicate_id=1, duplicate_fp=1, ret_status=1, finger_leave=1):
+    def auto_enroll(self, location_id, duplicate_id=1, duplicate_fp=1, ret_status=1, finger_leave=1):
         """
         Automatic registration a template
         """
@@ -219,11 +223,12 @@ class R503:
 if __name__ == '__main__':
     fp = R503()
 
-
     # for k, v in fp.read_sys_para_decode().items():
     #     print(k, v)
     # msg = fp.auto_enroll()
     # msg = fp.read_valid_template_num()
-
+    # print(msg)
+    msg = fp.get_image_ex()
+    print(msg)
     print('end.')
     fp.ser_close()
