@@ -1,5 +1,5 @@
 import serial
-from time import sleep, time
+# from time import sleep, time
 from struct import pack, unpack
 import sys
 import json
@@ -41,7 +41,7 @@ class R503:
         returns: confirmation code
         """
         cmd = pack('>BBBB', ctrl, speed, color, cycles)
-        rd = self.ser_send(pid=self.pid_command, pkg_len=0x07, instr_code=0x35, pkg=cmd)
+        rd = self.ser_send(pkg_len=0x07, instr_code=0x35, pkg=cmd)
         return -1 if rd == -1 else rd[4]
 
     def read_sys_para(self):
@@ -49,7 +49,7 @@ class R503:
         Status register and other basic configuration parameters
         returns: (list) status_reg, sys_id_code, finger_lib_size, security_lvl, device_addr, data_packet_size, baud_rate
         """
-        read_pkg = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x0F)
+        read_pkg = self.ser_send(pkg_len=0x03, instr_code=0x0F)
         return -1 if read_pkg == -1 else unpack('>HHHHIHH', read_pkg[5])
 
     def read_sys_para_decode(self):
@@ -75,13 +75,13 @@ class R503:
         }
 
     def check_pw(self, pw=0x00):
-        return self.ser_send(pid=self.pid_command, pkg_len=0x07, instr_code=0x13, pkg=pack('>I', pw))[4]
+        return self.ser_send(pkg_len=0x07, instr_code=0x13, pkg=pack('>I', pw))[4]
 
     def handshake(self):
-        return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x40)[4]
+        return self.ser_send(pkg_len=0x03, instr_code=0x40)[4]
 
     def check_sensor(self):
-        return self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x36)[4]
+        return self.ser_send(pkg_len=0x03, instr_code=0x36)[4]
 
     def confirmation_decode(self, c_code):
         cc = self.conf_codes()
@@ -91,23 +91,23 @@ class R503:
         """
         Detect a finger and store it in image_buffer
         """
-        read_conf_code = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x01)
+        read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x01)
         return -1 if read_conf_code == -1 else read_conf_code[4]
 
-    def get_img_ex(self):
+    def get_image_ex(self):
         """
         Detect a finger and store it in image_buffer return 0x07 if image poor quality
         """
-        read_conf_code = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x28)
+        read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x28)
         return -1 if read_conf_code == -1 else read_conf_code[4]
 
-    def img2tz(self, buffer_id=1):
+    def img2tz(self, buffer_id):
         """
         Generate character file from the original image in Image Buffer and store the file in CharBuffer 1 or 2
         parameter: (int) buffer_id, 1 or 2
         returns: (int) confirmation code
         """
-        read_conf_code = self.ser_send(pid=self.pid_command, pkg_len=0x04, instr_code=0x02, pkg=pack('>B', buffer_id))
+        read_conf_code = self.ser_send(pkg_len=0x04, instr_code=0x02, pkg=pack('>B', buffer_id))
         return -1 if read_conf_code == -1 else read_conf_code[4]
 
     def reg_model(self):
@@ -117,7 +117,7 @@ class R503:
         input parameters: None
         returns: (int) confirmation code
         """
-        read_conf_code = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x05)
+        read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x05)
         return -1 if read_conf_code == -1 else read_conf_code[4]
 
     def store(self, buffer_id, page_id):
@@ -125,19 +125,15 @@ class R503:
         Store the template of buffer1 or buffer2 on the flash library
         """
         package = pack('>BH', buffer_id, page_id)
-        read_conf_code = self.ser_send(pid=self.pid_command, pkg_len=0x06, instr_code=0x06, pkg=package, demo_mode=True)
+        read_conf_code = self.ser_send(pkg_len=0x06, instr_code=0x06, pkg=package, demo_mode=True)
         return -1 if read_conf_code == -1 else read_conf_code[4]
 
     def empty_finger_lib(self):
-        read_conf_code = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x0d)
-        return -1 if read_conf_code == -1 else read_conf_code[4]
-
-    def get_image_ex(self):
-        read_conf_code = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x28)
+        read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x0d)
         return -1 if read_conf_code == -1 else read_conf_code[4]
 
     def read_valid_template_num(self):
-        read_pkg = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x1d)
+        read_pkg = self.ser_send(pkg_len=0x03, instr_code=0x1d)
         return -1 if read_pkg == -1 else unpack('>H', read_pkg[5])
 
     def read_index_table(self, index_page=0):
@@ -147,7 +143,7 @@ class R503:
         returns: (list) index which fingerprints saved already
         """
         index_page = pack('>B', index_page)
-        temp = self.ser_send(pid=self.pid_command, pkg_len=0x04, instr_code=0x1f, pkg=index_page)
+        temp = self.ser_send(pkg_len=0x04, instr_code=0x1f, pkg=index_page)
         if temp == -1:
             return -1
         temp = temp[5]
@@ -161,7 +157,7 @@ class R503:
         Automatic registration a template
         """
         package = pack('>BBBBB', location_id, duplicate_id, duplicate_fp, ret_status, finger_leave)
-        read_pkg = self.ser_send(pid=self.pid_command, pkg_len=0x08, instr_code=0x31, pkg=package)
+        read_pkg = self.ser_send(pkg_len=0x08, instr_code=0x31, pkg=package)
         if read_pkg == -1:
             return -1
         return read_pkg[4]
@@ -172,14 +168,14 @@ class R503:
         return: (tuple) fp store location, match score
         """
         package = pack('>BBBBB', security_lvl, start_pos, end_pos, ret_key_step, num_of_fp_errors)
-        read_pkg = self.ser_send(pid=self.pid_command, pkg_len=0x08, instr_code=0x32, pkg=package, timeout=10)
+        read_pkg = self.ser_send(pkg_len=0x08, instr_code=0x32, pkg=package, timeout=10)
         if read_pkg == -1:
             return -1
         _, position, match_score = unpack('>BHH', read_pkg[5])
         return position, match_score
 
     def read_prod_info(self):
-        info = self.ser_send(pid=self.pid_command, pkg_len=0x03, instr_code=0x3c)
+        info = self.ser_send(pkg_len=0x03, instr_code=0x3c)
         if info == -1:
             return -1
         info = info[5]
@@ -202,7 +198,7 @@ class R503:
             'fp database size': unpack('>H', inf[8])[0]
         }
 
-    def ser_send(self, pid, pkg_len, instr_code, pkg=None, demo_mode=False, timeout=1):
+    def ser_send(self, pkg_len, instr_code, pid=pid_command, pkg=None, demo_mode=False, timeout=1):
         """
         pid, pkg_len, instr_code, pkg
         """
@@ -230,5 +226,9 @@ if __name__ == '__main__':
     # print(msg)
     msg = fp.get_image_ex()
     print(msg)
+    if msg == 0:
+        print('generating char file')
+        msg2 = fp.img2tz(buffer_id=1)
+        print(msg2)
     print('end.')
     fp.ser_close()
