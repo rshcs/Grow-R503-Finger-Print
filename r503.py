@@ -91,7 +91,7 @@ class R503:
         """
         Detect a finger and store it in image_buffer
         """
-        read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x01)
+        read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x01, print_hex=False)
         return -1 if read_conf_code == -1 else read_conf_code[4]
 
     def get_image_ex(self, print_hex=True):
@@ -125,10 +125,10 @@ class R503:
         Store the template of buffer1 or buffer2 on the flash library
         """
         package = pack('>BH', buffer_id, page_id)
-        read_conf_code = self.ser_send(pkg_len=0x06, instr_code=0x06, pkg=package, demo_mode=True, timeout=timeout)
+        read_conf_code = self.ser_send(pkg_len=0x06, instr_code=0x06, pkg=package, timeout=timeout)
         return -1 if read_conf_code == -1 else read_conf_code[4]
 
-    def manual_enroll(self, timeout=10, num_of_fps=2):
+    def manual_enroll(self, timeout=10, num_of_fps=4):
         inc = 1
         printed = False
         t1 = time()
@@ -151,7 +151,7 @@ class R503:
                     print('registering a finger print')
                     rm = self.reg_model(print_hex=False)
                     if rm == 0:
-                        st = self.store(buffer_id=1, page_id=12, timeout=5)
+                        st = self.store(buffer_id=1, page_id=5)
                         print(st)
                         print('finger print registered successfully.')
                         break
@@ -164,8 +164,15 @@ class R503:
                 print('Timeout')
                 break
 
-
-
+    def match(self):
+        """
+        Compare the recently extracted character with the templates in the ModelBuffer, providing matching result.
+        returns: (tuple) status: [0: matching, 1: error, 8: not matching], match score
+        """
+        rec_data = self.ser_send(pid=0x01, pkg_len=0x03, instr_code=0x03)
+        if rec_data == -1:
+            return -1
+        return rec_data[4], rec_data[5]
 
     def empty_finger_lib(self):
         read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x0d)
@@ -182,7 +189,7 @@ class R503:
         returns: (list) index which fingerprints saved already
         """
         index_page = pack('>B', index_page)
-        temp = self.ser_send(pkg_len=0x04, instr_code=0x1f, pkg=index_page)
+        temp = self.ser_send(pkg_len=0x04, instr_code=0x1f, pkg=index_page, print_hex=False)
         if temp == -1:
             return -1
         temp = temp[5]
@@ -237,6 +244,14 @@ class R503:
             'fp database size': unpack('>H', inf[8])[0]
         }
 
+    def get_random_code(self):
+        """
+        Generates a random number
+        returns: (unsigned 4 bytes integer)
+        """
+        read_pkg = self.ser_send(pkg_len=0x03, pid=0x01, instr_code=0x14, print_hex=False)
+        return -1 if read_pkg == -1 else unpack('>I', read_pkg[5])[0]
+
     def ser_send(self, pkg_len, instr_code, pid=pid_command, pkg=None, demo_mode=False, timeout=1, print_hex=True):
         """
         pid, pkg_len, instr_code, pkg
@@ -272,7 +287,8 @@ if __name__ == '__main__':
     #     msg2 = fp.img2tz(buffer_id=1)
     #     print(msg2)
 
-    fp.manual_enroll()
-
+    # fp.manual_enroll()
+    vt = fp.auto_identify()
+    print(vt)
     print('end.')
     fp.ser_close()
