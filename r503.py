@@ -91,33 +91,33 @@ class R503:
         """
         Detect a finger and store it in image_buffer
         """
-        read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x01, print_hex=False)
+        read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x01)
         return -1 if read_conf_code == -1 else read_conf_code[4]
 
-    def get_image_ex(self, print_hex=True):
+    def get_image_ex(self):
         """
         Detect a finger and store it in image_buffer return 0x07 if image poor quality
         """
-        read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x28, print_hex=print_hex)
+        read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x28)
         return -1 if read_conf_code == -1 else read_conf_code[4]
 
-    def img2tz(self, buffer_id, print_hex=True):
+    def img2tz(self, buffer_id):
         """
         Generate character file from the original image in Image Buffer and store the file in CharBuffer 1 or 2
         parameter: (int) buffer_id, 1 or 2
         returns: (int) confirmation code
         """
-        read_conf_code = self.ser_send(pkg_len=0x04, instr_code=0x02, pkg=pack('>B', buffer_id), print_hex=print_hex)
+        read_conf_code = self.ser_send(pkg_len=0x04, instr_code=0x02, pkg=pack('>B', buffer_id))
         return -1 if read_conf_code == -1 else read_conf_code[4]
 
-    def reg_model(self, print_hex=True):
+    def reg_model(self):
         """
         Combine info of character files in CharBuffer 1 and 2 and generate a template which is stored back in both
         CharBuffer 1 and 2
         input parameters: None
         returns: (int) confirmation code
         """
-        read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x05, print_hex=print_hex)
+        read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x05)
         return -1 if read_conf_code == -1 else read_conf_code[4]
 
     def store(self, buffer_id, page_id, timeout=2):
@@ -137,10 +137,10 @@ class R503:
             if not printed:
                 print(f'Place your finger on the sensor: {inc}')
                 printed = True
-            msg = self.get_image_ex(print_hex=False)
+            msg = self.get_image_ex()
             if msg == 0:
                 print('Reading the finger print')
-                char_status = self.img2tz(buffer_id=inc, print_hex=False)
+                char_status = self.img2tz(buffer_id=inc)
                 if char_status == 0:
                     print('Character file generation successful.')
                     finger_prints += 1
@@ -149,7 +149,7 @@ class R503:
                     inc -= 1
                 if finger_prints >= num_of_fps:
                     print('registering a finger print')
-                    rm = self.reg_model(print_hex=False)
+                    rm = self.reg_model()
                     if rm == 0:
                         st = self.store(buffer_id=1, page_id=5)
                         print(st)
@@ -174,6 +174,25 @@ class R503:
             return -1
         return rec_data[4], rec_data[5]
 
+    def search(self, buff_num=1, start_id=0, para=199):
+        """
+        Search the whole finger library for the template that matches the one in CharBuffer 1 or 2
+        returns: (tuple) Template number, match score
+        """
+        print(self.get_image_ex())
+        print(self.img2tz(1))
+        print('2')
+        sleep(2)
+        print(self.get_image_ex())
+        print(self.img2tz(2))
+        print('ok')
+        package = pack('>BHH', buff_num, start_id, para)
+        recv_data = self.ser_send(pid=0x01, pkg_len=0x08, instr_code=0x04, pkg=package)
+        temp_num, match_score = unpack('>HH', recv_data[5])
+        if recv_data == -1:
+            return -1
+        return recv_data[4], temp_num, match_score
+
     def empty_finger_lib(self):
         read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x0d)
         return -1 if read_conf_code == -1 else read_conf_code[4]
@@ -189,7 +208,7 @@ class R503:
         returns: (list) index which fingerprints saved already
         """
         index_page = pack('>B', index_page)
-        temp = self.ser_send(pkg_len=0x04, instr_code=0x1f, pkg=index_page, print_hex=False)
+        temp = self.ser_send(pkg_len=0x04, instr_code=0x1f, pkg=index_page)
         if temp == -1:
             return -1
         temp = temp[5]
@@ -249,10 +268,10 @@ class R503:
         Generates a random number
         returns: (unsigned 4 bytes integer)
         """
-        read_pkg = self.ser_send(pkg_len=0x03, pid=0x01, instr_code=0x14, print_hex=False)
+        read_pkg = self.ser_send(pkg_len=0x03, pid=0x01, instr_code=0x14)
         return -1 if read_pkg == -1 else unpack('>I', read_pkg[5])[0]
 
-    def ser_send(self, pkg_len, instr_code, pid=pid_command, pkg=None, demo_mode=False, timeout=1, print_hex=True):
+    def ser_send(self, pkg_len, instr_code, pid=pid_command, pkg=None, demo_mode=False, timeout=1, print_hex=False):
         """
         pid, pkg_len, instr_code, pkg
         """
@@ -288,7 +307,9 @@ if __name__ == '__main__':
     #     print(msg2)
 
     # fp.manual_enroll()
-    vt = fp.auto_identify()
+    vt = fp.search()
     print(vt)
+    # indx_table = fp.read_index_table()
+    # print(indx_table)
     print('end.')
     fp.ser_close()
