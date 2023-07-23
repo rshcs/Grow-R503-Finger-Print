@@ -75,13 +75,16 @@ class R503:
         }
 
     def check_pw(self, pw=0x00):
-        return self.ser_send(pkg_len=0x07, instr_code=0x13, pkg=pack('>I', pw))[4]
+        recv_data = self.ser_send(pkg_len=0x07, instr_code=0x13, pkg=pack('>I', pw))
+        return -1 if recv_data == -1 else recv_data[4]
 
     def handshake(self):
-        return self.ser_send(pkg_len=0x03, instr_code=0x40)[4]
+        recv_data = self.ser_send(pkg_len=0x03, instr_code=0x40)
+        return -1 if recv_data == -1 else recv_data[4]
 
     def check_sensor(self):
-        return self.ser_send(pkg_len=0x03, instr_code=0x36)[4]
+        recv_data = self.ser_send(pkg_len=0x03, instr_code=0x36)
+        return -1 if recv_data == -1 else recv_data[4]
 
     def confirmation_decode(self, c_code):
         cc = self.conf_codes()
@@ -128,7 +131,7 @@ class R503:
         read_conf_code = self.ser_send(pkg_len=0x06, instr_code=0x06, pkg=package, timeout=timeout)
         return -1 if read_conf_code == -1 else read_conf_code[4]
 
-    def manual_enroll(self, timeout=10, num_of_fps=4):
+    def manual_enroll(self, location, buffer_id=1, timeout=10, num_of_fps=4, loop_delay=.3):
         inc = 1
         printed = False
         t1 = time()
@@ -137,11 +140,9 @@ class R503:
             if not printed:
                 print(f'Place your finger on the sensor: {inc}')
                 printed = True
-            msg = self.get_image_ex()
-            if msg == 0:
+            if not self.get_image_ex():
                 print('Reading the finger print')
-                char_status = self.img2tz(buffer_id=inc)
-                if char_status == 0:
+                if not self.img2tz(buffer_id=inc):
                     print('Character file generation successful.')
                     finger_prints += 1
                 else:
@@ -149,17 +150,16 @@ class R503:
                     inc -= 1
                 if finger_prints >= num_of_fps:
                     print('registering a finger print')
-                    rm = self.reg_model()
-                    if rm == 0:
-                        st = self.store(buffer_id=1, page_id=5)
-                        print(st)
-                        print('finger print registered successfully.')
+                    if not self.reg_model():
+                        if not self.store(buffer_id=buffer_id, page_id=location):
+                            print('finger print registered successfully.')
+                        else:
+                            print('finger print register failed !')
                         break
                 inc += 1
-                sleep(2)
                 t1 = time()
                 printed = False
-            sleep(.3)
+            sleep(loop_delay)
             if time() - t1 > timeout:
                 print('Timeout')
                 break
@@ -174,18 +174,14 @@ class R503:
             return -1
         return rec_data[4], rec_data[5]
 
-    def search(self, buff_num=1, start_id=0, para=199):
+    def search(self, buff_num=1, start_id=0, para=200):
         """
         Search the whole finger library for the template that matches the one in CharBuffer 1 or 2
-        returns: (tuple) Template number, match score
+        parameters: buff_num = character buffer id, start_id = starting from, para = end position
+        returns: (tuple) status [success:0, error:1, no match:9], template number, match score
         """
-        print(self.get_image_ex())
-        print(self.img2tz(1))
-        print('2')
-        sleep(2)
-        print(self.get_image_ex())
-        print(self.img2tz(2))
-        print('ok')
+        self.get_image_ex()
+        self.img2tz(1)
         package = pack('>BHH', buff_num, start_id, para)
         recv_data = self.ser_send(pid=0x01, pkg_len=0x08, instr_code=0x04, pkg=package)
         temp_num, match_score = unpack('>HH', recv_data[5])
@@ -271,7 +267,15 @@ class R503:
         read_pkg = self.ser_send(pkg_len=0x03, pid=0x01, instr_code=0x14)
         return -1 if read_pkg == -1 else unpack('>I', read_pkg[5])[0]
 
-    def ser_send(self, pkg_len, instr_code, pid=pid_command, pkg=None, demo_mode=False, timeout=1, print_hex=False):
+    def get_available_location(self, index_page=0):
+        """
+        Provides next available location in fingerprint library
+        parameters: (int) index_page
+        Returns: (int) next available location
+        """
+        return min(set(range(200)).difference(self.read_index_table(index_page)), default=None)
+
+    def ser_send(self, pkg_len, instr_code, pid=pid_command, pkg=None, timeout=1):
         """
         pid, pkg_len, instr_code, pkg
         """
@@ -280,15 +284,12 @@ class R503:
             send_values += pkg
         check_sum = sum(send_values)
         send_values = self.header + self.addr + send_values + pack('>H', check_sum)
-        if print_hex:
-            print(send_values.hex(sep=' '))
-        if not demo_mode:
-            self.ser.timeout = timeout
-            self.ser.write(send_values)
-            read_val = self.ser.read(128)
-            if print_hex:
-                print(read_val.hex(sep=' '))
-            return -1 if read_val == b'' else self.read_msg(read_val)
+
+        self.ser.timeout = timeout
+        self.ser.write(send_values)
+        read_val = self.ser.read(128)
+
+        return -1 if read_val == b'' else self.read_msg(read_val)
 
 
 if __name__ == '__main__':
@@ -306,10 +307,14 @@ if __name__ == '__main__':
     #     msg2 = fp.img2tz(buffer_id=1)
     #     print(msg2)
 
-    # fp.manual_enroll()
+    # loc = fp.get_available_location()
+    # print(loc)
+    # fp.manual_enroll(location=loc)
+    sleep(3)
     vt = fp.search()
     print(vt)
     # indx_table = fp.read_index_table()
     # print(indx_table)
+
     print('end.')
     fp.ser_close()
