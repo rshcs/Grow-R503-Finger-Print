@@ -90,6 +90,18 @@ class R503:
         cc = self.conf_codes()
         return cc[str(c_code)] if c_code in cc else 'others: system reserved'
 
+    def up_image(self):
+        send_values = pack('>BHB', 0x01, 0x03, 0x0A)
+        check_sum = sum(send_values)
+        send_values = self.header + self.addr + send_values + pack('>H', check_sum)
+        self.ser.write(send_values)
+        read_val = self.ser.read(128)
+        if read_val == b'':
+            return -1
+        if read_val[9]:
+            return read_val[9]
+        return read_val[21:-2]
+
     def get_img(self):
         """
         Detect a finger and store it in image_buffer
@@ -184,9 +196,9 @@ class R503:
         self.img2tz(1)
         package = pack('>BHH', buff_num, start_id, para)
         recv_data = self.ser_send(pid=0x01, pkg_len=0x08, instr_code=0x04, pkg=package)
-        temp_num, match_score = unpack('>HH', recv_data[5])
         if recv_data == -1:
             return -1
+        temp_num, match_score = unpack('>HH', recv_data[5])
         return recv_data[4], temp_num, match_score
 
     def empty_finger_lib(self):
@@ -310,11 +322,16 @@ if __name__ == '__main__':
     # loc = fp.get_available_location()
     # print(loc)
     # fp.manual_enroll(location=loc)
-    sleep(3)
-    vt = fp.search()
-    print(vt)
+    # sleep(3)
+    # vt = fp.search()
+    # print(vt)
     # indx_table = fp.read_index_table()
     # print(indx_table)
-
+    print('place your finger')
+    sleep(3)
+    x = fp.get_image_ex()
+    print(f'image captured: {x}')
+    y = fp.up_image()
+    print(y)
     print('end.')
     fp.ser_close()
