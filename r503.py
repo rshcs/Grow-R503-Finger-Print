@@ -9,11 +9,11 @@ class R503:
     header = pack('>H', 0xEF01)
     pid_command = 0x01  # pid_command packet
     
-    def __init__(self, port=8, baud=57600, pw=0, addr=0xFFFFFFFF):
+    def __init__(self, port=8, baud=57600, pw=0, addr=0xFFFFFFFF, timeout=1):
         self.pw = pack('>I', pw)
         self.addr = pack('>I', addr)
         try:
-            self.ser = serial.Serial(f'COM{port}', baud, timeout=1)
+            self.ser = serial.Serial(f'COM{port}', baud, timeout=timeout)
         except serial.serialutil.SerialException:
             sys.exit('Serial port not found !')
 
@@ -30,6 +30,12 @@ class R503:
         pkg = data_stream[10:len(data_stream)-2]
         chksum_rd = unpack('>H', data_stream[-2:])
         return hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd, pkg, chksum_rd
+
+    def cancel(self):
+        recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x30)
+        if recv_data == -1:
+            return -1
+        return recv_data[4]
 
     def led_control(self, ctrl=0x03, speed=0, color=0x01, cycles=0):
         """
@@ -88,7 +94,8 @@ class R503:
 
     def confirmation_decode(self, c_code):
         cc = self.conf_codes()
-        return cc[str(c_code)] if c_code in cc else 'others: system reserved'
+        c_code = str(c_code)
+        return cc[c_code] if c_code in cc else 'others: system reserved'
 
     def up_image(self):
         send_values = pack('>BHB', 0x01, 0x03, 0x0A)
@@ -175,6 +182,14 @@ class R503:
             if time() - t1 > timeout:
                 print('Timeout')
                 break
+
+    def delete_char(self, page_num, num_of_temps_to_del=1):
+        package = pack('>HH', page_num, num_of_temps_to_del)
+        recv_code = self.ser_send(pid=0x01, pkg_len=0x07, instr_code=0x0C, pkg=package)
+        if recv_code == -1:
+            return -1
+        return recv_code[4]
+
 
     def match(self):
         """
@@ -271,6 +286,18 @@ class R503:
             'fp database size': unpack('>H', inf[8])[0]
         }
 
+    def get_fw_ver(self):
+        recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x3A)
+        if recv_data == -1:
+            return -1
+        return recv_data[4], recv_data[5]
+
+    def get_alg_ver(self):
+        recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x39)
+        if recv_data == -1:
+            return -1
+        return recv_data[4], recv_data[5]
+
     def get_random_code(self):
         """
         Generates a random number
@@ -327,11 +354,13 @@ if __name__ == '__main__':
     # print(vt)
     # indx_table = fp.read_index_table()
     # print(indx_table)
-    print('place your finger')
-    sleep(3)
-    x = fp.get_image_ex()
-    print(f'image captured: {x}')
-    y = fp.up_image()
-    print(y)
+    # print('place your finger')
+    # sleep(3)
+    # x = fp.get_image_ex()
+    # print(f'image captured: {x}')
+    # y = fp.up_image()
+    # print(y)
+    x = fp.get_fw_ver()
+    print(x)
     print('end.')
     fp.ser_close()
