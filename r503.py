@@ -102,7 +102,18 @@ class R503:
         check_sum = sum(send_values)
         send_values = self.header + self.addr + send_values + pack('>H', check_sum)
         self.ser.write(send_values)
-        read_val = self.ser.read(128)
+        read_val = self.ser.read(4096)
+        if read_val == b'':
+            return -1
+        if read_val[9]:
+            return read_val[9]
+        return read_val[21:-2]
+
+    def read_info_page(self):
+        send_values = pack('>BHB', 0x01, 0x03, 0x16)
+        send_values = self.header + self.addr + send_values + pack('>H', sum(send_values))
+        self.ser.write(send_values)
+        read_val = self.ser.read(580)
         if read_val == b'':
             return -1
         if read_val[9]:
@@ -189,7 +200,6 @@ class R503:
         if recv_code == -1:
             return -1
         return recv_code[4]
-
 
     def match(self):
         """
@@ -298,6 +308,12 @@ class R503:
             return -1
         return recv_data[4], recv_data[5]
 
+    def soft_reset(self):
+        recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x3D)
+        if recv_data == -1:
+            return -1
+        return recv_data[4]
+
     def get_random_code(self):
         """
         Generates a random number
@@ -360,7 +376,8 @@ if __name__ == '__main__':
     # print(f'image captured: {x}')
     # y = fp.up_image()
     # print(y)
-    x = fp.get_fw_ver()
+    x = fp.up_image()
+    print(len(x))
     print(x)
     print('end.')
     fp.ser_close()
