@@ -7,7 +7,7 @@ import json
 
 class R503:
     header = pack('>H', 0xEF01)
-    pid_command = 0x01  # pid_command packet
+    pid_cmd = 0x01  # pid_command packet
     
     def __init__(self, port=8, baud=57600, pw=0, addr=0xFFFFFFFF, timeout=1):
         self.pw = pack('>I', pw)
@@ -32,7 +32,7 @@ class R503:
         return hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd, pkg, chksum_rd
 
     def cancel(self):
-        recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x30)
+        recv_data = self.ser_send(pid=self.cmd, pkg_len=3, instr_code=0x30)
         if recv_data == -1:
             return -1
         return recv_data[4]
@@ -341,7 +341,36 @@ class R503:
         """
         return min(set(range(200)).difference(self.read_index_table(index_page)), default=None)
 
-    def ser_send(self, pkg_len, instr_code, pid=pid_command, pkg=None, timeout=1):
+    def write_notepad(self, page_no, content):
+        """
+        Write data to the specific flash pages: 0 to 15, each page contains 32bytes of data, any data type is given to
+        the content will be converted to the string data type before writing to the notepad.
+        parameters:
+            page_no: (int) 1 - 15, page number
+            content: (any) data to write to the flash
+        returns: (int) status code => 0 - success, 1 - error when receiving pkg, 18 - error when write flash,
+        """
+        content = str(content)
+        len_content = len(content)
+        if len_content > 32 or page_no > 0x0F or page_no < 0:
+            return -1
+        pkg = pack('>B32s', page_no, content.encode())
+        recv_data = self.ser_send(pid=0x01, pkg_len=0x24, instr_code=0x18, pkg=pkg)
+        return -1 if recv_data == -1 else recv_data[4]
+
+    def read_notepad(self, page_no):
+        """
+        Read the specific page of the flash memory
+        returns: (int) status code, (bytearray) data in the page
+        """
+        if page_no > 0x0F or page_no < 0:
+            return -1
+        recv_data = self.ser_send(pid=0x01, pkg_len=0x04, instr_code=0x19, pkg=pack('>B', page_no))
+        if recv_data == -1:
+            return -1
+        return recv_data[4], recv_data[5]
+
+    def ser_send(self, pkg_len, instr_code, pid=pid_cmd, pkg=None, timeout=1):
         """
         pid, pkg_len, instr_code, pkg
         """
@@ -386,14 +415,16 @@ if __name__ == '__main__':
     # print(f'image captured: {x}')
     # y = fp.up_image()
     # print(y)
-    print('Put the finger on the sensor...')
-    sleep(3)
-    fp_get = fp.get_image_ex()
-    print('error' if fp_get else 'success')
-    x = fp.up_image()
-    print(len(x))
-    for y in x:
-        print(y)
+    # print('Put the finger on the sensor...')
+    # sleep(3)
+    # fp_get = fp.get_image_ex()
+    # print('error' if fp_get else 'success')
+    # x = fp.up_image()
+    # print(len(x))
+    # for y in x:
+    #     print(y)
 
-    # print('end.')
+    # print(fp.write_notepad(0, 12345))
+    print(fp.read_notepad(0))
+    print('end.')
     fp.ser_close()
