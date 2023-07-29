@@ -97,17 +97,28 @@ class R503:
         c_code = str(c_code)
         return cc[c_code] if c_code in cc else 'others: system reserved'
 
-    def up_image(self):
+    def up_image(self, timeout=5, raw=False):
+        """
+        Upload the image in Img_Buffer to upper computer
+        every image contains the data around 20kilo bytes
+        parameter: (int) timeout: timeout could vary if you change the baud rate, for 57600baud 5seconds is sufficient
+        If you use a lower baud rate timeout may have to be increased.
+        returns: (bytesarray) if raw == True
+                 else (list of lists)
+        In raw mode returns the data with all headers (address byte, status bytes etc.)
+        raw == False mode only returns the image data [all other header bytes are filtered out]
+        """
         send_values = pack('>BHB', 0x01, 0x03, 0x0A)
         check_sum = sum(send_values)
         send_values = self.header + self.addr + send_values + pack('>H', check_sum)
         self.ser.write(send_values)
-        read_val = self.ser.read(4096)
+        self.ser.timeout = timeout
+        read_val = self.ser.read(22000)
         if read_val == b'':
             return -1
         if read_val[9]:
             return read_val[9]
-        return read_val[21:-2]
+        return read_val if raw else [img_data[3:] for img_data in read_val.split(sep=self.header + self.addr)][2:]
 
     def read_info_page(self):
         send_values = pack('>BHB', 0x01, 0x03, 0x16)
@@ -370,14 +381,19 @@ if __name__ == '__main__':
     # print(vt)
     # indx_table = fp.read_index_table()
     # print(indx_table)
-    # print('place your finger')
-    # sleep(3)
+
     # x = fp.get_image_ex()
     # print(f'image captured: {x}')
     # y = fp.up_image()
     # print(y)
+    print('Put the finger on the sensor...')
+    sleep(3)
+    fp_get = fp.get_image_ex()
+    print('error' if fp_get else 'success')
     x = fp.up_image()
     print(len(x))
-    print(x)
-    print('end.')
+    for y in x:
+        print(y)
+
+    # print('end.')
     fp.ser_close()
