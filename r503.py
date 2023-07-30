@@ -200,10 +200,46 @@ class R503:
             if recv_data[4]:
                 return recv_data[4]
         pkt_len = len(img_data[-1]) + 2
-        recv_data = self.ser_send(pid=0x02, pkg_len=pkt_len, pkg=img_data[-1])
-        if recv_data[4]:
-            return recv_data[4]
-        return 0
+        return self.ser_send(pid=0x02, pkg_len=pkt_len, pkg=img_data[-1])[4]
+
+    def up_char(self, timeout=5, raw=False):
+        """
+        Upload the data in template buffer to the upper computer
+        parameter: (int) timeout: timeout could vary if you change the baud rate, for 57600baud 5seconds is sufficient
+        If you use a lower baud rate timeout may have to be increased.
+        returns: (bytesarray) if raw == True
+                 else (list of lists)
+        In raw mode returns the data with all headers (address byte, status bytes etc.)
+        raw == False mode only returns the image data [all other header bytes are filtered out]
+        """
+        send_values = pack('>BHBB', 0x01, 0x04, 0x08, 0x01)
+        check_sum = sum(send_values)
+        send_values = self.header + self.addr + send_values + pack('>H', check_sum)
+        self.ser.write(send_values)
+        self.ser.timeout = timeout
+        read_val = self.ser.read(22000)
+        if read_val == b'':
+            return -1
+        if read_val[9]:
+            return read_val[9]
+        return read_val if raw else [img_data[3:] for img_data in read_val.split(sep=self.header + self.addr)][2:]
+
+    def down_char(self, img_data, buffer_id=1):
+        """
+        Download a template from the upper computer to modular buffer
+        """
+        recv_data0 = self.ser_send(pid=0x01, pkg_len=0x04, instr_code=0x09, pkg=pack('>B', buffer_id))
+        if recv_data0 == -1:
+            return -1
+        if not recv_data0[4]:
+            return recv_data0[4]
+        for img_pkt in img_data[:-1]:
+            pkt_len = len(img_pkt) + 2
+            recv_data = self.ser_send(pid=0x02, pkg_len=pkt_len, pkg=img_pkt)
+            if recv_data[4]:
+                return recv_data[4]
+        pkt_len = len(img_data[-1]) + 2
+        return self.ser_send(pid=0x02, pkg_len=pkt_len, pkg=img_data[-1])[4]
 
     def read_info_page(self):
         send_values = pack('>BHB', 0x01, 0x03, 0x16)
@@ -511,11 +547,6 @@ if __name__ == '__main__':
     # print('reading completed')
     # y = fp.down_image(x)
     # print(y)
-
-    # y = fp.set_address(0xFFFFFFFF)
-    # print(y)
-    x = fp.read_sys_para_decode()
-    print(x)
 
     print('end.')
     fp.ser_close()
