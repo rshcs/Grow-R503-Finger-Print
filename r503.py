@@ -24,7 +24,14 @@ class R503:
 
     def ser_close(self):
         self.ser.close()
-    
+
+    def set_pw(self, new_pw):
+        self.pw = pack('>I', new_pw)
+        recv_data = self.ser_send(pid=0x01, pkg_len=0x07, instr_code=0x12, pkg=self.pw)
+        if recv_data == -1:
+            return -1
+        return recv_data[4]
+
     def read_msg(self, data_stream):
         hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd = unpack('>HIBHB', data_stream[:10])
         pkg = data_stream[10:len(data_stream)-2]
@@ -80,7 +87,7 @@ class R503:
             'baud_rate': rsp[6] * 9600,
         }
 
-    def check_pw(self, pw=0x00):
+    def verify_pw(self, pw=0x00):
         recv_data = self.ser_send(pkg_len=0x07, instr_code=0x13, pkg=pack('>I', pw))
         return -1 if recv_data == -1 else recv_data[4]
 
@@ -96,6 +103,18 @@ class R503:
         cc = self.conf_codes()
         c_code = str(c_code)
         return cc[c_code] if c_code in cc else 'others: system reserved'
+
+    def load_char(self, page_id, buffer_id=1):
+        """
+        Load template ath the specified location of flash library to template buffer
+        parameters: page_id => (int) page number
+                    buffer id => (int) character buffer id
+        """
+        pkg = pack('>BH', buffer_id, page_id)
+        recv_data = self.ser_send(pid=0x01, pkg_len=0x06, instr_code=0x07, pkg=pkg)
+        if recv_data == -1:
+            return -1
+        return recv_data[4]
 
     def up_image(self, timeout=5, raw=False):
         """
@@ -119,6 +138,23 @@ class R503:
         if read_val[9]:
             return read_val[9]
         return read_val if raw else [img_data[3:] for img_data in read_val.split(sep=self.header + self.addr)][2:]
+
+    def down_image(self, img_data):
+        recv_data0 = self.ser_send(pid=0x01, pkg_len=0x03, instr_code=0x0B)
+        if recv_data0 == -1:
+            return -1
+        if not recv_data0[4]:
+            return recv_data0[4]
+        for img_pkt in img_data[:-1]:
+            pkt_len = len(img_pkt) + 2
+            recv_data = self.ser_send(pid=0x02, pkg_len=pkt_len, pkg=img_pkt)
+            if recv_data[4]:
+                return recv_data[4]
+        pkt_len = len(img_data[-1]) + 2
+        recv_data = self.ser_send(pid=0x02, pkg_len=pkt_len, pkg=img_data[-1])
+        if recv_data[4]:
+            return recv_data[4]
+        return 0
 
     def read_info_page(self):
         send_values = pack('>BHB', 0x01, 0x03, 0x16)
@@ -423,8 +459,14 @@ if __name__ == '__main__':
     # print(len(x))
     # for y in x:
     #     print(y)
+    # print('reading completed')
+    # y = fp.down_image(x)
+    # print(y)
 
-    # print(fp.write_notepad(0, 12345))
-    print(fp.read_notepad(0))
+
+    # x = fp.read_prod_info_decode()
+    y = fp.read_sys_para_decode()
+    print(y)
+
     print('end.')
     fp.ser_close()
