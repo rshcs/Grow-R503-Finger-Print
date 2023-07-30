@@ -12,10 +12,9 @@ class R503:
     def __init__(self, port=8, baud=57600, pw=0, addr=0xFFFFFFFF, timeout=1, recv_size=128):
         self.pw = pack('>I', pw)
         self.addr = pack('>I', addr)
-        self.baud = baud
         self.recv_size = recv_size
         try:
-            self.ser = serial.Serial(f'COM{port}', self.baud, timeout=timeout)
+            self.ser = serial.Serial(f'COM{port}', baudrate=baud, timeout=timeout)
         except serial.serialutil.SerialException:
             sys.exit('Serial port not found !')
 
@@ -30,6 +29,19 @@ class R503:
     def set_pw(self, new_pw):
         self.pw = pack('>I', new_pw)
         recv_data = self.ser_send(pid=0x01, pkg_len=0x07, instr_code=0x12, pkg=self.pw)
+        if recv_data == -1:
+            return -1
+        return recv_data[4]
+
+    def set_address(self, new_addr):
+        """
+        Set module address
+        *Set the new address when setting the class object next time*
+        parameter: (int) new_addr
+        returns: (int) confirmation code => 0 [success], 1, 24, -1
+        """
+        self.addr = pack('>I', new_addr)
+        recv_data = self.ser_send(pid=0x01, pkg_len=0x07, instr_code=0x15, pkg=self.addr)
         if recv_data == -1:
             return -1
         return recv_data[4]
@@ -62,10 +74,12 @@ class R503:
     def set_sys_para(self, parameter, content):
         """
         Set system parameters: baud rate or security level or packet content length
-        parameter: (str) 'baud' or 'security' or 'pkt_len'
-        content: (int) if parameter == 'baud' then content => 9600, 19200, 38400, 57600[default], 115200
+        **Set baud parameter accordingly when creating the class object next time if you changed the baud rate here**
+        parameters: parameter: (str) 'baud' or 'security' or 'pkt_len'
+                    content: (int) if parameter == 'baud' then content => 9600, 19200, 38400, 57600[default], 115200
                        if parameter == 'security' then content => 1, 2, 3, 4, 5
                        if parameter == 'pkt_len' then content => 32, 64, 128, 256
+        returns: 0(success), 1, 26, 24 or -1
         """
         if parameter == 'baud':
             parameter = 4
@@ -84,11 +98,11 @@ class R503:
                 return -1
         else:
             return -1
-        recv_data = self.ser_send(pid=0x01, pkg_len=0x05, instr_code=0x0E, pkg=pack('>BB', parameter, content))
+        recv_data = self.ser_send(pid=0x01, pkg_len=0x05, instr_code=0x0E, pkg=pack('>BB', parameter, content0))
         status = recv_data[4]
         if not status:
             if parameter == 4:
-                self.baud = content
+                self.ser.baudrate = content
             elif parameter == 6:
                 self.recv_size = content
         return status
@@ -498,10 +512,10 @@ if __name__ == '__main__':
     # y = fp.down_image(x)
     # print(y)
 
-
-    # x = fp.read_prod_info_decode()
-    y = fp.read_sys_para_decode()
-    print(y)
+    # y = fp.set_address(0xFFFFFFFF)
+    # print(y)
+    x = fp.read_sys_para_decode()
+    print(x)
 
     print('end.')
     fp.ser_close()
