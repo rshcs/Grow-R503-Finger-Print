@@ -9,11 +9,13 @@ class R503:
     header = pack('>H', 0xEF01)
     pid_cmd = 0x01  # pid_command packet
     
-    def __init__(self, port=8, baud=57600, pw=0, addr=0xFFFFFFFF, timeout=1):
+    def __init__(self, port=8, baud=57600, pw=0, addr=0xFFFFFFFF, timeout=1, recv_size=128):
         self.pw = pack('>I', pw)
         self.addr = pack('>I', addr)
+        self.baud = baud
+        self.recv_size = recv_size
         try:
-            self.ser = serial.Serial(f'COM{port}', baud, timeout=timeout)
+            self.ser = serial.Serial(f'COM{port}', self.baud, timeout=timeout)
         except serial.serialutil.SerialException:
             sys.exit('Serial port not found !')
 
@@ -39,7 +41,7 @@ class R503:
         return hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd, pkg, chksum_rd
 
     def cancel(self):
-        recv_data = self.ser_send(pid=self.cmd, pkg_len=3, instr_code=0x30)
+        recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x30)
         if recv_data == -1:
             return -1
         return recv_data[4]
@@ -57,6 +59,40 @@ class R503:
         rd = self.ser_send(pkg_len=0x07, instr_code=0x35, pkg=cmd)
         return -1 if rd == -1 else rd[4]
 
+    def set_sys_para(self, parameter, content):
+        """
+        Set system parameters: baud rate or security level or packet content length
+        parameter: (str) 'baud' or 'security' or 'pkt_len'
+        content: (int) if parameter == 'baud' then content => 9600, 19200, 38400, 57600[default], 115200
+                       if parameter == 'security' then content => 1, 2, 3, 4, 5
+                       if parameter == 'pkt_len' then content => 32, 64, 128, 256
+        """
+        if parameter == 'baud':
+            parameter = 4
+            content0 = int(content / 9600)
+            if content0 not in [1, 2, 4, 6, 12]:
+                return -1
+        elif parameter == 'security':
+            parameter = 5
+            content0 = content
+            if content0 not in [1, 2, 3, 4, 5]:
+                return -1
+        elif parameter == 'pkt_len':
+            parameter = 6
+            content0 = {32: 0, 64: 1, 128: 2, 256: 3}.get(content)
+            if content0 not in [0, 1, 2, 3]:
+                return -1
+        else:
+            return -1
+        recv_data = self.ser_send(pid=0x01, pkg_len=0x05, instr_code=0x0E, pkg=pack('>BB', parameter, content))
+        status = recv_data[4]
+        if not status:
+            if parameter == 4:
+                self.baud = content
+            elif parameter == 6:
+                self.recv_size = content
+        return status
+
     def read_sys_para(self):
         """
         Status register and other basic configuration parameters
@@ -73,7 +109,6 @@ class R503:
         rsp = self.read_sys_para()
         if rsp == -1:
             return -1
-        pkg_length = {0: 32, 1: 64, 2: 128, 3: 256}
         return {
             'system_busy': bool(rsp[0] & 1),
             'matching_finger_found': bool(rsp[0] & 2),
@@ -83,7 +118,7 @@ class R503:
             'finger_library_size': rsp[2],
             'security_level': rsp[3],
             'device_address': hex(rsp[4]),
-            'data_packet_size': pkg_length[rsp[5]],
+            'data_packet_size': {0: 32, 1: 64, 2: 128, 3: 256}[rsp[5]],
             'baud_rate': rsp[6] * 9600,
         }
 
@@ -418,7 +453,7 @@ class R503:
 
         self.ser.timeout = timeout
         self.ser.write(send_values)
-        read_val = self.ser.read(128)
+        read_val = self.ser.read(self.recv_size)
 
         return -1 if read_val == b'' else self.read_msg(read_val)
 
