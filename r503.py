@@ -364,7 +364,7 @@ class R503:
 
     def read_valid_template_num(self):
         read_pkg = self.ser_send(pkg_len=0x03, instr_code=0x1d)
-        return -1 if read_pkg == -1 else unpack('>H', read_pkg[5])
+        return -1 if read_pkg == -1 else unpack('>H', read_pkg[5])[0]
 
     def read_index_table(self, index_page=0):
         """
@@ -547,6 +547,7 @@ if __name__ == '__main__':
     # print('reading completed')
     # y = fp.down_image(x)
     # print(y)
+    print(fp.read_prod_info_decode())
 
     print('end.')
     fp.ser_close()

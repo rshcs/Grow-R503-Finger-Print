@@ -7,16 +7,16 @@
 
 # GROW R503 Fingerprint 
 
-![Fingerprint_sensor](https://i.ibb.co/2vWR4jH/seonsor.jpg)
+![Fingerprint_sensor](https://i.ibb.co/Z2rnD0K/seonsor.jpg)
 
 ---
 
 ### Features
 
-* Written in pure python with only using build in modules except *pyserial*.
+* Written in pure python.
 * Provides all the manufacturer specified operations of the module.
 * Can be connected with a computer directly with a USB to TTL converter. (Do not need a microcontroller)
-* Can be used for testing or direct applications.
+* Can be used for testing the functionality of the module or creating direct applications without involving a microcontroller.
 
 ---
 
@@ -25,12 +25,12 @@
 
 |Sensor Side|RS232 Converter|
 |---|---|
-|Red <br>(power)|3.3v Power|
-|White <br>(touch induction power)|3.3v power|
-|Black <br>(Ground)|Ground (0v)|
-|Maroon or Green or Brown <br> (Rx)|Tx|
-|Yellow <br> (Tx)|Rx|
-|Blue <br> (Wakeup)|Not connected|
+|Red (power)|3.3v Power|
+|White (touch induction power)|3.3v power|
+|Black (Ground)|Ground (0v)|
+|Maroon or Green or Brown (Rx)|Tx|
+|Yellow  (Tx)|Rx|
+|Blue (Wakeup)|Not connected|
 
 ![Connections](https://i.ibb.co/SyXvZ2G/connections.png)
 (Ref: Datasheet)
@@ -43,10 +43,10 @@
 
 --- 
 
-#### Tip
-![rs232_usb](https://i.ibb.co/MndQz7M/usb-to-rs232.png)
+#### Usb to TTL
+![rs232_usb](https://i.ibb.co/nmkbvb3/usb-to-rs232.png)
 * This module can be used to interface with the module since it provides 5v to 3.3v conversion for both logic level and power.
-* However make sure to switch jumper position to the 3.3v and connect 3.3v power pin of the converter.
+* However, make sure to switch jumper position to the 3.3v and connect 3.3v power pin of the converter.
 
 ### Installation
 
@@ -54,4 +54,118 @@
 * Run `pip install pyserial` on terminal.
 
 * Download **r503.py** file.
+
+### Basic usage overview
+
+---
+#### Registering a fingerprint
+
+    from r503 import R503
+
+    fp = R503()
+    fp.manual_enroll(location=7)
+
+* you have to place the finger 4 (changeable) times on the sensor during the process
+
+Terminal output:
+
+    Place your finger on the sensor: 1
+    Reading the finger print
+    Character file generation successful.
+    Place your finger on the sensor: 2
+    Reading the finger print
+    Character file generation successful.
+    Place your finger on the sensor: 3
+    Reading the finger print
+    Character file generation successful.
+    Place your finger on the sensor: 4
+    Reading the finger print
+    Character file generation successful.
+    registering a finger print
+    finger print registered successfully.
+
+---
+
+#### Search a Fingerprint from the stored data
+
+    from r503 import R503
+    from time import sleep
+    
+    fp = R503()
+    
+    print('Place your finger on the sensor..')
+    sleep(3)
+    print(fp.search())
+
+Terminal output:
+
+    Place your finger on the sensor..
+    (0, 7, 90)
+
+* first value = success if 0
+* second value = stored location of the memory
+* third value = match score
+
+---
+
+Number of fingerprints in the memory
+
+    from r503 import R503
+    
+    fp = R503()
+    print('Num of templates: ', fp.read_valid_template_num())
+
+Terminal output:
+
+    Num of templates: 3
+
+---
+#### Read fingerprint stored locations
+
+    from r503 import R503
+    
+    fp = R503()
+    print(fp.read_index_table())
+
+Terminal output:
+
+    [7, 15, 32]
+
+---
+
+#### Aura LED Control
+
+    from r503 import R503
+    
+    fp = R503()
+    fp.led_control(ctrl=3, color=5)
+
+Output: LED keeps on with a specific color according to the number
+
+---
+#### Read Product Information
+
+    from r503 import R503
+    
+    fp = R503()
+
+    for k, v in fp.read_prod_info_decode().items():
+        print(k, ': ', v)
+
+Terminal output:
+
+    module type :  R5xx1111
+    batch number :  1111
+    serial number :  10080307
+    hw main version :  1
+    hw sub version :  1
+    sensor type :  GR192RGB
+    image width :  192
+    image height :  192
+    template size :  1536
+    fp database size :  200
+
+---
+
+
 
