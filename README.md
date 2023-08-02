@@ -48,8 +48,9 @@
 * This module can be used to interface with the module since it provides 5v to 3.3v conversion for both logic level and power.
 * However, make sure to switch jumper position to the 3.3v and connect 3.3v power pin of the converter.
 
-### Installation
+---
 
+### Installation
 
 * Run `pip install pyserial` on terminal.
 

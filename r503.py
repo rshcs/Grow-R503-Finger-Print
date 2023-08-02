@@ -19,14 +19,26 @@ class R503:
             sys.exit('Serial port not found !')
 
     def conf_codes(self):
+        """
+        Read confirmation codes from the json file
+        returns: json object
+        """
         with open('confirmation_codes.json', 'r') as jf:
             jsob = json.load(jf)
         return jsob
 
     def ser_close(self):
+        """
+        Close the serial port
+        """
         self.ser.close()
 
     def set_pw(self, new_pw):
+        """
+        Set modules handshaking password
+        parameters: (int) new_pw - New password
+        returns: (int) confirmation code
+        """
         self.pw = pack('>I', new_pw)
         recv_data = self.ser_send(pid=0x01, pkg_len=0x07, instr_code=0x12, pkg=self.pw)
         if recv_data == -1:
@@ -47,12 +59,20 @@ class R503:
         return recv_data[4]
 
     def read_msg(self, data_stream):
+        """
+        Unpack byte stream to readable data
+        returns: (tuple) header, address, package id, package len, confirmation code, package, checksum
+        """
         hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd = unpack('>HIBHB', data_stream[:10])
         pkg = data_stream[10:len(data_stream)-2]
         chksum_rd = unpack('>H', data_stream[-2:])
         return hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd, pkg, chksum_rd
 
     def cancel(self):
+        """
+        Cancel instruction
+        returns: (int) confirmation code
+        """
         recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x30)
         if recv_data == -1:
             return -1
@@ -137,18 +157,35 @@ class R503:
         }
 
     def verify_pw(self, pw=0x00):
+        """
+        Verify modules handshaking password
+        returns: (int) confirmation code
+        """
         recv_data = self.ser_send(pkg_len=0x07, instr_code=0x13, pkg=pack('>I', pw))
         return -1 if recv_data == -1 else recv_data[4]
 
     def handshake(self):
+        """
+        Send handshake instructions to the module, Confirmation code 0 receives if the sensor is normal
+        returns: (int) confirmation code
+        """
         recv_data = self.ser_send(pkg_len=0x03, instr_code=0x40)
         return -1 if recv_data == -1 else recv_data[4]
 
     def check_sensor(self):
+        """
+        Check whether the sensor is normal
+        returns: (int) confirmation code
+        """
         recv_data = self.ser_send(pkg_len=0x03, instr_code=0x36)
         return -1 if recv_data == -1 else recv_data[4]
 
     def confirmation_decode(self, c_code):
+        """
+        Decode confirmation code to understandable string
+        parameter: (int) c_code - confirmation code
+        returns: (str) decoded confirmation code
+        """
         cc = self.conf_codes()
         c_code = str(c_code)
         return cc[c_code] if c_code in cc else 'others: system reserved'
@@ -189,6 +226,11 @@ class R503:
         return read_val if raw else [img_data[3:] for img_data in read_val.split(sep=self.header + self.addr)][2:]
 
     def down_image(self, img_data):
+        """
+        Download image from the upper computer to the image buffer
+        parameters: img_data (list of lists) image data as a list of lists
+        returns: confirmation code
+        """
         recv_data0 = self.ser_send(pid=0x01, pkg_len=0x03, instr_code=0x0B)
         if recv_data0 == -1:
             return -1
@@ -207,7 +249,7 @@ class R503:
         Upload the data in template buffer to the upper computer
         parameter: (int) timeout: timeout could vary if you change the baud rate, for 57600baud 5seconds is sufficient
         If you use a lower baud rate timeout may have to be increased.
-        returns: (bytesarray) if raw == True
+        returns: (bytearray) if raw == True
                  else (list of lists)
         In raw mode returns the data with all headers (address byte, status bytes etc.)
         raw == False mode only returns the image data [all other header bytes are filtered out]
@@ -227,6 +269,7 @@ class R503:
     def down_char(self, img_data, buffer_id=1):
         """
         Download a template from the upper computer to modular buffer
+        returns: (int) confirmation code
         """
         recv_data0 = self.ser_send(pid=0x01, pkg_len=0x04, instr_code=0x09, pkg=pack('>B', buffer_id))
         if recv_data0 == -1:
@@ -242,6 +285,10 @@ class R503:
         return self.ser_send(pid=0x02, pkg_len=pkt_len, pkg=img_data[-1])[4]
 
     def read_info_page(self):
+        """
+        Read the information page
+        returns: (int) confirmation code or (bytearray) info page contents
+        """
         send_values = pack('>BHB', 0x01, 0x03, 0x16)
         send_values = self.header + self.addr + send_values + pack('>H', sum(send_values))
         self.ser.write(send_values)
@@ -255,6 +302,7 @@ class R503:
     def get_img(self):
         """
         Detect a finger and store it in image_buffer
+        returns: (int) confirmation code
         """
         read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x01)
         return -1 if read_conf_code == -1 else read_conf_code[4]
@@ -262,6 +310,7 @@ class R503:
     def get_image_ex(self):
         """
         Detect a finger and store it in image_buffer return 0x07 if image poor quality
+        returns: (int) confirmation code
         """
         read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x28)
         return -1 if read_conf_code == -1 else read_conf_code[4]
