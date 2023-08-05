@@ -41,9 +41,7 @@ class R503:
         """
         self.pw = pack('>I', new_pw)
         recv_data = self.ser_send(pid=0x01, pkg_len=0x07, instr_code=0x12, pkg=self.pw)
-        if recv_data == -1:
-            return -1
-        return recv_data[4]
+        return -1 if recv_data == -1 else recv_data[4]
 
     def set_address(self, new_addr):
         """
@@ -54,9 +52,7 @@ class R503:
         """
         self.addr = pack('>I', new_addr)
         recv_data = self.ser_send(pid=0x01, pkg_len=0x07, instr_code=0x15, pkg=self.addr)
-        if recv_data == -1:
-            return -1
-        return recv_data[4]
+        return -1 if recv_data == -1 else recv_data[4]
 
     def read_msg(self, data_stream):
         """
@@ -74,9 +70,7 @@ class R503:
         returns: (int) confirmation code
         """
         recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x30)
-        if recv_data == -1:
-            return -1
-        return recv_data[4]
+        return -1 if recv_data == -1 else recv_data[4]
 
     def led_control(self, ctrl=0x03, speed=0, color=0x01, cycles=0):
         """
@@ -198,9 +192,7 @@ class R503:
         """
         pkg = pack('>BH', buffer_id, page_id)
         recv_data = self.ser_send(pid=0x01, pkg_len=0x06, instr_code=0x07, pkg=pkg)
-        if recv_data == -1:
-            return -1
-        return recv_data[4]
+        return -1 if recv_data == -1 else recv_data[4]
 
     def up_image(self, timeout=5, raw=False):
         """
@@ -293,11 +285,7 @@ class R503:
         send_values = self.header + self.addr + send_values + pack('>H', sum(send_values))
         self.ser.write(send_values)
         read_val = self.ser.read(580)
-        if read_val == b'':
-            return -1
-        if read_val[9]:
-            return read_val[9]
-        return read_val[21:-2]
+        return -1 if read_val == b'' else read_val[9] or read_val[21:-2]
 
     def get_img(self):
         """
@@ -343,6 +331,23 @@ class R503:
         return -1 if read_conf_code == -1 else read_conf_code[4]
 
     def manual_enroll(self, location, buffer_id=1, timeout=10, num_of_fps=4, loop_delay=.3):
+        """
+        Manually enroll a new fingerprint.
+
+        Args:
+            location: The memory location to store the fingerprint.
+            buffer_id: The buffer id to store intermediate data. Default 1.
+            timeout: The timeout in seconds. Default 10.
+            num_of_fps: The number of fingerprints to capture. Default 4.
+            loop_delay: The delay between capture attempts in seconds. Default 0.3.
+
+        This function will:
+            - Prompt the user to place their finger on the sensor and capture fingerprints.
+            - Generate character files from the fingerprints.
+            - Register a fingerprint model once num_of_fps prints are captured.
+            - Store the fingerprint model in the specified memory location.
+            - Timeout after timeout seconds if fingerprints are not captured.
+        """
         inc = 1
         printed = False
         t1 = time()
@@ -376,11 +381,24 @@ class R503:
                 break
 
     def delete_char(self, page_num, num_of_temps_to_del=1):
+        """
+        Delete stored fingerprint templates.
+
+        Args:
+            page_num: The page number to delete templates from.
+            num_of_temps_to_del: The number of templates to delete. Default is 1.
+
+        Returns:
+            Confirmation code integer. -1 on error.
+
+        This function will:
+            - Pack the page number and number of templates to delete into a packet.
+            - Send the delete instruction packet to the sensor.
+            - Return the confirmation code response from the sensor.
+        """
         package = pack('>HH', page_num, num_of_temps_to_del)
         recv_code = self.ser_send(pid=0x01, pkg_len=0x07, instr_code=0x0C, pkg=package)
-        if recv_code == -1:
-            return -1
-        return recv_code[4]
+        return -1 if recv_code == -1 else recv_code[4]
 
     def match(self):
         """
@@ -388,9 +406,7 @@ class R503:
         returns: (tuple) status: [0: matching, 1: error, 8: not matching], match score
         """
         rec_data = self.ser_send(pid=0x01, pkg_len=0x03, instr_code=0x03)
-        if rec_data == -1:
-            return -1
-        return rec_data[4], rec_data[5]
+        return -1 if rec_data == -1 else (rec_data[4], rec_data[5])
 
     def search(self, buff_num=1, start_id=0, para=200):
         """
@@ -408,6 +424,17 @@ class R503:
         return recv_data[4], temp_num, match_score
 
     def empty_finger_lib(self):
+        """
+        Empty all stored fingerprints.
+
+        This function will:
+            - Send the empty library instruction to the sensor.
+            - Return the confirmation code response.
+            - Returns -1 on error.
+
+        Returns:
+            Confirmation code integer.
+        """
         read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x0d)
         return -1 if read_conf_code == -1 else read_conf_code[4]
 
@@ -437,9 +464,7 @@ class R503:
         """
         package = pack('>BBBBB', location_id, duplicate_id, duplicate_fp, ret_status, finger_leave)
         read_pkg = self.ser_send(pkg_len=0x08, instr_code=0x31, pkg=package)
-        if read_pkg == -1:
-            return -1
-        return read_pkg[4]
+        return -1 if read_pkg == -1 else read_pkg[4]
 
     def auto_identify(self, security_lvl=3, start_pos=0, end_pos=199, ret_key_step=0, num_of_fp_errors=1):
         """
@@ -479,21 +504,15 @@ class R503:
 
     def get_fw_ver(self):
         recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x3A)
-        if recv_data == -1:
-            return -1
-        return recv_data[4], recv_data[5]
+        return -1 if recv_data == -1 else (recv_data[4], recv_data[5])
 
     def get_alg_ver(self):
         recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x39)
-        if recv_data == -1:
-            return -1
-        return recv_data[4], recv_data[5]
+        return -1 if recv_data == -1 else (recv_data[4], recv_data[5])
 
     def soft_reset(self):
         recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x3D)
-        if recv_data == -1:
-            return -1
-        return recv_data[4]
+        return -1 if recv_data == -1 else recv_data[4]
 
     def get_random_code(self):
         """
@@ -536,9 +555,7 @@ class R503:
         if page_no > 0x0F or page_no < 0:
             return -1
         recv_data = self.ser_send(pid=0x01, pkg_len=0x04, instr_code=0x19, pkg=pack('>B', page_no))
-        if recv_data == -1:
-            return -1
-        return recv_data[4], recv_data[5]
+        return -1 if recv_data == -1 else (recv_data[4], recv_data[5])
 
     def ser_send(self, pkg_len, instr_code, pid=pid_cmd, pkg=None, timeout=1):
         """
