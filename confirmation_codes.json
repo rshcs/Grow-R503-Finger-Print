@@ -33,5 +33,7 @@
   "31": "1Fh: fingerprint library is full",
   "252": "FCh: unsupported command",
   "253": "FDh: hardware error",
-  "254": "FEh: command execution failure"
+  "254": "FEh: command execution failure",
+  "99": "Data not received from the module **",
+  "101": "Incorrect page number or content length **"
 }

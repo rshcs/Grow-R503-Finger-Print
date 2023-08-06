@@ -41,18 +41,18 @@ class R503:
         """
         self.pw = pack('>I', new_pw)
         recv_data = self.ser_send(pid=0x01, pkg_len=0x07, instr_code=0x12, pkg=self.pw)
-        return -1 if recv_data == -1 else recv_data[4]
+        return recv_data[4]
 
     def set_address(self, new_addr):
         """
         Set module address
         *Set the new address when setting the class object next time*
         parameter: (int) new_addr
-        returns: (int) confirmation code => 0 [success], 1, 24, -1
+        returns: (int) confirmation code => 0 [success], 1, 24, 99
         """
         self.addr = pack('>I', new_addr)
         recv_data = self.ser_send(pid=0x01, pkg_len=0x07, instr_code=0x15, pkg=self.addr)
-        return -1 if recv_data == -1 else recv_data[4]
+        return recv_data[4]
 
     def read_msg(self, data_stream):
         """
@@ -62,7 +62,7 @@ class R503:
         hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd = unpack('>HIBHB', data_stream[:10])
         pkg = data_stream[10:len(data_stream)-2]
         chksum_rd = unpack('>H', data_stream[-2:])
-        return hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd, pkg, chksum_rd
+        return hdr_rd, adr_rd, pkg_id_rd, pkg_len_rd, conf_code_rd, None if pkg == b'' else pkg, sum(chksum_rd)
 
     def cancel(self):
         """
@@ -70,7 +70,7 @@ class R503:
         returns: (int) confirmation code
         """
         recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x30)
-        return -1 if recv_data == -1 else recv_data[4]
+        return recv_data[4]
 
     def led_control(self, ctrl=0x03, speed=0, color=0x01, cycles=0):
         """
@@ -83,7 +83,7 @@ class R503:
         """
         cmd = pack('>BBBB', ctrl, speed, color, cycles)
         rd = self.ser_send(pkg_len=0x07, instr_code=0x35, pkg=cmd)
-        return -1 if rd == -1 else rd[4]
+        return rd[4]
 
     def set_sys_para(self, parameter, content):
         """
@@ -127,7 +127,7 @@ class R503:
         returns: (list) status_reg, sys_id_code, finger_lib_size, security_lvl, device_addr, data_packet_size, baud_rate
         """
         read_pkg = self.ser_send(pkg_len=0x03, instr_code=0x0F)
-        return -1 if read_pkg == -1 else unpack('>HHHHIHH', read_pkg[5])
+        return 99 if read_pkg[4] == 99 else unpack('>HHHHIHH', read_pkg[5])
 
     def read_sys_para_decode(self):
         """
@@ -135,8 +135,8 @@ class R503:
         returns: (dictionary) system parameters
         """
         rsp = self.read_sys_para()
-        if rsp == -1:
-            return -1
+        if rsp == 99:
+            return 99
         return {
             'system_busy': bool(rsp[0] & 1),
             'matching_finger_found': bool(rsp[0] & 2),
@@ -156,7 +156,7 @@ class R503:
         returns: (int) confirmation code
         """
         recv_data = self.ser_send(pkg_len=0x07, instr_code=0x13, pkg=pack('>I', pw))
-        return -1 if recv_data == -1 else recv_data[4]
+        return recv_data[4]
 
     def handshake(self):
         """
@@ -164,7 +164,7 @@ class R503:
         returns: (int) confirmation code
         """
         recv_data = self.ser_send(pkg_len=0x03, instr_code=0x40)
-        return -1 if recv_data == -1 else recv_data[4]
+        return recv_data[4]
 
     def check_sensor(self):
         """
@@ -172,7 +172,7 @@ class R503:
         returns: (int) confirmation code
         """
         recv_data = self.ser_send(pkg_len=0x03, instr_code=0x36)
-        return -1 if recv_data == -1 else recv_data[4]
+        return recv_data[4]
 
     def confirmation_decode(self, c_code):
         """
@@ -192,7 +192,7 @@ class R503:
         """
         pkg = pack('>BH', buffer_id, page_id)
         recv_data = self.ser_send(pid=0x01, pkg_len=0x06, instr_code=0x07, pkg=pkg)
-        return -1 if recv_data == -1 else recv_data[4]
+        return recv_data[4]
 
     def up_image(self, timeout=5, raw=False):
         """
@@ -224,8 +224,6 @@ class R503:
         returns: confirmation code
         """
         recv_data0 = self.ser_send(pid=0x01, pkg_len=0x03, instr_code=0x0B)
-        if recv_data0 == -1:
-            return -1
         if not recv_data0[4]:
             return recv_data0[4]
         for img_pkt in img_data[:-1]:
@@ -264,8 +262,6 @@ class R503:
         returns: (int) confirmation code
         """
         recv_data0 = self.ser_send(pid=0x01, pkg_len=0x04, instr_code=0x09, pkg=pack('>B', buffer_id))
-        if recv_data0 == -1:
-            return -1
         if not recv_data0[4]:
             return recv_data0[4]
         for img_pkt in img_data[:-1]:
@@ -285,7 +281,7 @@ class R503:
         send_values = self.header + self.addr + send_values + pack('>H', sum(send_values))
         self.ser.write(send_values)
         read_val = self.ser.read(580)
-        return -1 if read_val == b'' else read_val[9] or read_val[21:-2]
+        return 99 if read_val == b'' else read_val[9] or read_val[21:-2]
 
     def get_img(self):
         """
@@ -293,7 +289,7 @@ class R503:
         returns: (int) confirmation code
         """
         read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x01)
-        return -1 if read_conf_code == -1 else read_conf_code[4]
+        return read_conf_code[4]
 
     def get_image_ex(self):
         """
@@ -301,7 +297,7 @@ class R503:
         returns: (int) confirmation code
         """
         read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x28)
-        return -1 if read_conf_code == -1 else read_conf_code[4]
+        return read_conf_code[4]
 
     def img2tz(self, buffer_id):
         """
@@ -310,7 +306,7 @@ class R503:
         returns: (int) confirmation code
         """
         read_conf_code = self.ser_send(pkg_len=0x04, instr_code=0x02, pkg=pack('>B', buffer_id))
-        return -1 if read_conf_code == -1 else read_conf_code[4]
+        return read_conf_code[4]
 
     def reg_model(self):
         """
@@ -320,7 +316,7 @@ class R503:
         returns: (int) confirmation code
         """
         read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x05)
-        return -1 if read_conf_code == -1 else read_conf_code[4]
+        return read_conf_code[4]
 
     def store(self, buffer_id, page_id, timeout=2):
         """
@@ -328,7 +324,7 @@ class R503:
         """
         package = pack('>BH', buffer_id, page_id)
         read_conf_code = self.ser_send(pkg_len=0x06, instr_code=0x06, pkg=package, timeout=timeout)
-        return -1 if read_conf_code == -1 else read_conf_code[4]
+        return read_conf_code[4]
 
     def manual_enroll(self, location, buffer_id=1, timeout=10, num_of_fps=4, loop_delay=.3):
         """
@@ -389,7 +385,7 @@ class R503:
             num_of_temps_to_del: The number of templates to delete. Default is 1.
 
         Returns:
-            Confirmation code integer. -1 on error.
+            Confirmation code integer.
 
         This function will:
             - Pack the page number and number of templates to delete into a packet.
@@ -398,7 +394,7 @@ class R503:
         """
         package = pack('>HH', page_num, num_of_temps_to_del)
         recv_code = self.ser_send(pid=0x01, pkg_len=0x07, instr_code=0x0C, pkg=package)
-        return -1 if recv_code == -1 else recv_code[4]
+        return recv_code[4]
 
     def match(self):
         """
@@ -406,7 +402,7 @@ class R503:
         returns: (tuple) status: [0: matching, 1: error, 8: not matching], match score
         """
         rec_data = self.ser_send(pid=0x01, pkg_len=0x03, instr_code=0x03)
-        return -1 if rec_data == -1 else (rec_data[4], rec_data[5])
+        return rec_data[4], rec_data[5]
 
     def search(self, buff_num=1, start_id=0, para=200):
         """
@@ -418,8 +414,8 @@ class R503:
         self.img2tz(1)
         package = pack('>BHH', buff_num, start_id, para)
         recv_data = self.ser_send(pid=0x01, pkg_len=0x08, instr_code=0x04, pkg=package)
-        if recv_data == -1:
-            return -1
+        if recv_data[4] == 99:
+            return 99
         temp_num, match_score = unpack('>HH', recv_data[5])
         return recv_data[4], temp_num, match_score
 
@@ -430,17 +426,16 @@ class R503:
         This function will:
             - Send the empty library instruction to the sensor.
             - Return the confirmation code response.
-            - Returns -1 on error.
 
         Returns:
             Confirmation code integer.
         """
         read_conf_code = self.ser_send(pkg_len=0x03, instr_code=0x0d)
-        return -1 if read_conf_code == -1 else read_conf_code[4]
+        return read_conf_code[4]
 
     def read_valid_template_num(self):
         read_pkg = self.ser_send(pkg_len=0x03, instr_code=0x1d)
-        return -1 if read_pkg == -1 else unpack('>H', read_pkg[5])[0]
+        return unpack('>H', read_pkg[5])[0]
 
     def read_index_table(self, index_page=0):
         """
@@ -450,8 +445,8 @@ class R503:
         """
         index_page = pack('>B', index_page)
         temp = self.ser_send(pkg_len=0x04, instr_code=0x1f, pkg=index_page)
-        if temp == -1:
-            return -1
+        if temp[4] == 99:
+            return 99
         temp = temp[5]
         temp_indx = []
         for n, lv in enumerate(temp):
@@ -464,7 +459,7 @@ class R503:
         """
         package = pack('>BBBBB', location_id, duplicate_id, duplicate_fp, ret_status, finger_leave)
         read_pkg = self.ser_send(pkg_len=0x08, instr_code=0x31, pkg=package)
-        return -1 if read_pkg == -1 else read_pkg[4]
+        return read_pkg[4]
 
     def auto_identify(self, security_lvl=3, start_pos=0, end_pos=199, ret_key_step=0, num_of_fp_errors=1):
         """
@@ -473,22 +468,22 @@ class R503:
         """
         package = pack('>BBBBB', security_lvl, start_pos, end_pos, ret_key_step, num_of_fp_errors)
         read_pkg = self.ser_send(pkg_len=0x08, instr_code=0x32, pkg=package, timeout=10)
-        if read_pkg == -1:
-            return -1
+        if read_pkg[4] == 99:
+            return 99
         _, position, match_score = unpack('>BHH', read_pkg[5])
         return position, match_score
 
     def read_prod_info(self):
         info = self.ser_send(pkg_len=0x03, instr_code=0x3c)
-        if info == -1:
-            return -1
+        if info[4] == 99:
+            return 99
         info = info[5]
         return info[:16], info[16:20], info[20:28], info[28:30], info[30:38], info[38:40], info[40:42], info[42:44], info[44:46]
 
     def read_prod_info_decode(self):
         inf = self.read_prod_info()
-        if inf == -1:
-            return -1
+        if inf == 99:
+            return 99
         return {
             'module type': inf[0].decode('ascii').replace('\x00', ''),
             'batch number': inf[1].decode('ascii'),
@@ -504,15 +499,15 @@ class R503:
 
     def get_fw_ver(self):
         recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x3A)
-        return -1 if recv_data == -1 else (recv_data[4], recv_data[5])
+        return (recv_data[4], recv_data[5])
 
     def get_alg_ver(self):
         recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x39)
-        return -1 if recv_data == -1 else (recv_data[4], recv_data[5])
+        return (recv_data[4], recv_data[5])
 
     def soft_reset(self):
         recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x3D)
-        return -1 if recv_data == -1 else recv_data[4]
+        return recv_data[4]
 
     def get_random_code(self):
         """
@@ -520,7 +515,7 @@ class R503:
         returns: (unsigned 4 bytes integer)
         """
         read_pkg = self.ser_send(pkg_len=0x03, pid=0x01, instr_code=0x14)
-        return -1 if read_pkg == -1 else unpack('>I', read_pkg[5])[0]
+        return unpack('>I', read_pkg[5])[0]
 
     def get_available_location(self, index_page=0):
         """
@@ -542,10 +537,10 @@ class R503:
         content = str(content)
         len_content = len(content)
         if len_content > 32 or page_no > 0x0F or page_no < 0:
-            return -1
+            return 101
         pkg = pack('>B32s', page_no, content.encode())
         recv_data = self.ser_send(pid=0x01, pkg_len=0x24, instr_code=0x18, pkg=pkg)
-        return -1 if recv_data == -1 else recv_data[4]
+        return recv_data[4]
 
     def read_notepad(self, page_no):
         """
@@ -555,7 +550,7 @@ class R503:
         if page_no > 0x0F or page_no < 0:
             return -1
         recv_data = self.ser_send(pid=0x01, pkg_len=0x04, instr_code=0x19, pkg=pack('>B', page_no))
-        return -1 if recv_data == -1 else (recv_data[4], recv_data[5])
+        return recv_data[4], recv_data[5]
 
     def ser_send(self, pkg_len, instr_code, pid=pid_cmd, pkg=None, timeout=1):
         """
@@ -566,20 +561,15 @@ class R503:
             send_values += pkg
         check_sum = sum(send_values)
         send_values = self.header + self.addr + send_values + pack('>H', check_sum)
-
         self.ser.timeout = timeout
         self.ser.write(send_values)
         read_val = self.ser.read(self.recv_size)
-
-        return -1 if read_val == b'' else self.read_msg(read_val)
+        return [0, 0, 0, 0, 99, None, 0] if read_val == b'' else self.read_msg(read_val)
 
 
 if __name__ == '__main__':
     fp = R503()
 
-    # for k, v in fp.read_sys_para_decode().items():
-    #     print(k, v)
-    # msg = fp.auto_enroll()
     # msg = fp.read_valid_template_num()
     # print(msg)
     # msg = fp.get_image_ex()
@@ -614,6 +604,6 @@ if __name__ == '__main__':
     # y = fp.down_image(x)
     # print(y)
     print(fp.read_prod_info_decode())
-
+    # print(fp.verify_pw())
     print('end.')
     fp.ser_close()
