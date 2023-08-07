@@ -9,7 +9,7 @@ class R503:
     header = pack('>H', 0xEF01)
     pid_cmd = 0x01  # pid_command packet
     
-    def __init__(self, port=8, baud=57600, pw=0, addr=0xFFFFFFFF, timeout=1, recv_size=128):
+    def __init__(self, port=5, baud=57600, pw=0, addr=0xFFFFFFFF, timeout=1, recv_size=128):
         self.pw = pack('>I', pw)
         self.addr = pack('>I', addr)
         self.recv_size = recv_size
@@ -82,44 +82,41 @@ class R503:
         returns: confirmation code
         """
         cmd = pack('>BBBB', ctrl, speed, color, cycles)
-        rd = self.ser_send(pkg_len=0x07, instr_code=0x35, pkg=cmd)
-        return rd[4]
+        return self.ser_send(pkg_len=0x07, instr_code=0x35, pkg=cmd)[4]
 
-    def set_sys_para(self, parameter, content):
+    def set_baud(self, baud=57600):
         """
-        Set system parameters: baud rate or security level or packet content length
-        **Set baud parameter accordingly when creating the class object next time if you changed the baud rate here**
-        parameters: parameter: (str) 'baud' or 'security' or 'pkt_len'
-                    content: (int) if parameter == 'baud' then content => 9600, 19200, 38400, 57600[default], 115200
-                       if parameter == 'security' then content => 1, 2, 3, 4, 5
-                       if parameter == 'pkt_len' then content => 32, 64, 128, 256
-        returns: 0(success), 1, 26, 24 or -1
+        9600, 19200, 38400, 57600[default], 115200
         """
-        if parameter == 'baud':
-            parameter = 4
-            content0 = int(content / 9600)
-            if content0 not in [1, 2, 4, 6, 12]:
-                return -1
-        elif parameter == 'security':
-            parameter = 5
-            content0 = content
-            if content0 not in [1, 2, 3, 4, 5]:
-                return -1
-        elif parameter == 'pkt_len':
-            parameter = 6
-            content0 = {32: 0, 64: 1, 128: 2, 256: 3}.get(content)
-            if content0 not in [0, 1, 2, 3]:
-                return -1
-        else:
-            return -1
-        recv_data = self.ser_send(pid=0x01, pkg_len=0x05, instr_code=0x0E, pkg=pack('>BB', parameter, content0))
-        status = recv_data[4]
-        if not status:
-            if parameter == 4:
-                self.ser.baudrate = content
-            elif parameter == 6:
-                self.recv_size = content
-        return status
+        baud0 = int(baud / 9600)
+        if baud0 not in [1, 2, 4, 6, 12]:
+            return 102
+        conf_code = self.ser_send(pid=0x01, pkg_len=0x05, instr_code=0x0E, pkg=pack('>BB', 4, baud0))[4]
+        if conf_code:
+            return conf_code
+        self.ser.baudrate = baud
+        return conf_code
+
+    def set_security(self, lvl=3):
+        """
+        1, 2, 3, 4, 5
+        """
+        if lvl not in [1, 2, 3, 4, 5]:
+            return 102
+        return self.ser_send(pid=0x01, pkg_len=0x05, instr_code=0x0E, pkg=pack('>BB', 5, lvl))[4]
+
+    def set_pkg_length(self, pkg_len=128):
+        """
+        32, 64, 128, 256
+        """
+        pkg_len0 = {32: 0, 64: 1, 128: 2, 256: 3}.get(pkg_len)
+        if pkg_len0 not in [0, 1, 2, 3]:
+            return 102
+        conf_code = self.ser_send(pid=0x01, pkg_len=0x05, instr_code=0x0E, pkg=pack('>BB', 6, pkg_len0))[4]
+        if conf_code:
+            return conf_code
+        self.recv_size = pkg_len
+        return conf_code
 
     def read_sys_para(self):
         """
@@ -499,15 +496,14 @@ class R503:
 
     def get_fw_ver(self):
         recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x3A)
-        return (recv_data[4], recv_data[5])
+        return recv_data[4], recv_data[5]
 
     def get_alg_ver(self):
         recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x39)
-        return (recv_data[4], recv_data[5])
+        return recv_data[4], recv_data[5]
 
     def soft_reset(self):
-        recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x3D)
-        return recv_data[4]
+        return self.ser_send(pid=0x01, pkg_len=3, instr_code=0x3D)[4]
 
     def get_random_code(self):
         """
@@ -515,7 +511,7 @@ class R503:
         returns: (unsigned 4 bytes integer)
         """
         read_pkg = self.ser_send(pkg_len=0x03, pid=0x01, instr_code=0x14)
-        return unpack('>I', read_pkg[5])[0]
+        return 99 if read_pkg[4] == 99 else unpack('>I', read_pkg[5])[0]
 
     def get_available_location(self, index_page=0):
         """
@@ -602,7 +598,7 @@ if __name__ == '__main__':
     #     print(y)
     # print('reading completed')
     # y = fp.down_image(x)
-    # print(y)
+
     print(fp.read_prod_info_decode())
     # print(fp.verify_pw())
     print('end.')

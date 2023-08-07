@@ -35,5 +35,6 @@
   "253": "FDh: hardware error",
   "254": "FEh: command execution failure",
   "99": "Data not received from the module **",
-  "101": "Incorrect page number or content length **"
+  "101": "Incorrect page number or content length **",
+  "102": "Not an expected argument"
 }

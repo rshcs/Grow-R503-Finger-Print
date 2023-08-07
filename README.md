@@ -63,7 +63,7 @@
 
     from r503 import R503
 
-    fp = R503()
+    fp = R503(port=5)
     fp.manual_enroll(location=7)
 
 * you have to place the finger 4 (changeable) times on the sensor during the process
@@ -92,7 +92,7 @@ Terminal output:
     from r503 import R503
     from time import sleep
     
-    fp = R503()
+    fp = R503(port=5)
     
     print('Place your finger on the sensor..')
     sleep(3)
@@ -113,7 +113,7 @@ Number of fingerprints in the memory
 
     from r503 import R503
     
-    fp = R503()
+    fp = R503(port=5)
     print('Num of templates: ', fp.read_valid_template_num())
 
 Terminal output:
@@ -125,7 +125,7 @@ Terminal output:
 
     from r503 import R503
     
-    fp = R503()
+    fp = R503(port=5)
     print(fp.read_index_table())
 
 Terminal output:
@@ -138,7 +138,7 @@ Terminal output:
 
     from r503 import R503
     
-    fp = R503()
+    fp = R503(port=5)
     fp.led_control(ctrl=3, color=5)
 
 Output: LED keeps on with a specific color according to the number
@@ -148,7 +148,7 @@ Output: LED keeps on with a specific color according to the number
 
     from r503 import R503
     
-    fp = R503()
+    fp = R503(port=5)
 
     for k, v in fp.read_prod_info_decode().items():
         print(k, ': ', v)
