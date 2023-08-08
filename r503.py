@@ -20,8 +20,13 @@ class R503:
 
     def conf_codes(self):
         """
-        Read confirmation codes from the json file
-        returns: json object
+        Read confirmation codes from the json file.
+        This function opens the 'confirmation_codes.json' file,
+        loads the JSON data from it, and returns the loaded JSON object.
+        Parameters:
+            self: The R503 class instance.
+        Returns:
+            jsob: The loaded JSON object containing the confirmation codes.
         """
         with open('confirmation_codes.json', 'r') as jf:
             jsob = json.load(jf)
@@ -29,7 +34,7 @@ class R503:
 
     def ser_close(self):
         """
-        Close the serial port
+        Closes the serial port
         """
         self.ser.close()
 
@@ -86,7 +91,22 @@ class R503:
 
     def set_baud(self, baud=57600):
         """
-        9600, 19200, 38400, 57600[default], 115200
+        Set the baud rate for serial communication.
+
+        This function sets the baud rate for serial communication to one of
+        the allowed values: 9600, 19200, 38400, 57600 (default), 115200.
+
+        Parameters:
+            self: The R503 class instance.
+            baud (int): The desired baud rate. Default is 57600.
+
+        Returns:
+            conf_code (int): The confirmation code received after setting
+                the baud rate. 0 means success.
+
+        It calculates the baud rate divisor, checks if it is valid, sends the
+        set baud rate command, updates the self.ser.baudrate if successful,
+        and returns the confirmation code.
         """
         baud0 = int(baud / 9600)
         if baud0 not in [1, 2, 4, 6, 12]:
@@ -99,7 +119,25 @@ class R503:
 
     def set_security(self, lvl=3):
         """
-        1, 2, 3, 4, 5
+        Set the security level of the fingerprint sensor.
+
+        This function sets the security level to one of 5 levels:
+        1: Low
+        2: Medium
+        3: High (default)
+        4: Higher
+        5: Highest
+
+        Parameters:
+            self: The R503 class instance.
+            lvl (int): The desired security level, 1-5. Default is 3.
+
+        Returns:
+            conf_code (int): The confirmation code received after setting the
+            security level. 0 means success.
+
+        It checks if the security level is valid, sends the set security
+        command with the level, and returns the confirmation code response.
         """
         if lvl not in [1, 2, 3, 4, 5]:
             return 102
@@ -107,7 +145,22 @@ class R503:
 
     def set_pkg_length(self, pkg_len=128):
         """
-        32, 64, 128, 256
+        Set the package length for serial communication.
+
+        This function sets the package length to one of the allowed
+        values: 32, 64, 128 (default), 256 bytes.
+
+        Parameters:
+            self: The R503 class instance.
+            pkg_len (int): The desired package length. Default is 128.
+
+        Returns:
+            conf_code (int): The confirmation code received after setting
+                the package length. 0 means success.
+
+        It maps the package lengths to index values, checks if valid,
+        sends the set command, updates self.recv_size if successful,
+        and returns the confirmation code response.
         """
         pkg_len0 = {32: 0, 64: 1, 128: 2, 256: 3}.get(pkg_len)
         if pkg_len0 not in [0, 1, 2, 3]:
@@ -128,8 +181,26 @@ class R503:
 
     def read_sys_para_decode(self):
         """
-        Get decoded system parameters in more human-readable way
-        returns: (dictionary) system parameters
+        Get system parameters in a decoded, human-readable format.
+
+        Otherwise, it returns a dictionary with the parameters decoded:
+
+        - system_busy: boolean
+        - matching_finger_found: boolean
+        - pw_verified: boolean
+        - valid_image_in_buffer: boolean
+        - system_id_code: int
+        - finger_library_size: int
+        - security_level: int
+        - device_address: int
+        - data_packet_size: int
+        - baud_rate: int
+
+        Parameters:
+            self: The R503 instance.
+
+        Returns:
+            dict: Decoded system parameters if successful, else 99.
         """
         rsp = self.read_sys_para()
         if rsp == 99:
@@ -212,7 +283,7 @@ class R503:
             return -1
         if read_val[9]:
             return read_val[9]
-        return read_val if raw else [img_data[3:] for img_data in read_val.split(sep=self.header + self.addr)][2:]
+        return read_val if raw else [img_data[3:-2] for img_data in read_val.split(sep=self.header + self.addr)][2:]
 
     def down_image(self, img_data):
         """
@@ -221,15 +292,18 @@ class R503:
         returns: confirmation code
         """
         recv_data0 = self.ser_send(pid=0x01, pkg_len=0x03, instr_code=0x0B)
-        if not recv_data0[4]:
+        if recv_data0[4]:
             return recv_data0[4]
         for img_pkt in img_data[:-1]:
-            pkt_len = len(img_pkt) + 2
-            recv_data = self.ser_send(pid=0x02, pkg_len=pkt_len, pkg=img_pkt)
-            if recv_data[4]:
-                return recv_data[4]
-        pkt_len = len(img_data[-1]) + 2
-        return self.ser_send(pid=0x02, pkg_len=pkt_len, pkg=img_data[-1])[4]
+            self.down_packet(img_pkt)
+        self.down_packet(img_data[-1], end=True)
+
+    def down_packet(self, img_pkt, end=False):
+        pkt_len = len(img_pkt)
+        content = pack(f'>BH{pkt_len}s', 0x08 if end else 0x02, pkt_len+2, img_pkt)
+        checksum = sum(content)
+        send_values = self.header + self.addr + content + pack('>H', checksum)
+        self.ser.write(send_values)
 
     def up_char(self, timeout=5, raw=False):
         """
@@ -251,7 +325,7 @@ class R503:
             return -1
         if read_val[9]:
             return read_val[9]
-        return read_val if raw else [img_data[3:] for img_data in read_val.split(sep=self.header + self.addr)][2:]
+        return read_val if raw else [img_data[3:-2] for img_data in read_val.split(sep=self.header + self.addr)][2:]
 
     def down_char(self, img_data, buffer_id=1):
         """
@@ -259,15 +333,11 @@ class R503:
         returns: (int) confirmation code
         """
         recv_data0 = self.ser_send(pid=0x01, pkg_len=0x04, instr_code=0x09, pkg=pack('>B', buffer_id))
-        if not recv_data0[4]:
+        if recv_data0[4]:
             return recv_data0[4]
         for img_pkt in img_data[:-1]:
-            pkt_len = len(img_pkt) + 2
-            recv_data = self.ser_send(pid=0x02, pkg_len=pkt_len, pkg=img_pkt)
-            if recv_data[4]:
-                return recv_data[4]
-        pkt_len = len(img_data[-1]) + 2
-        return self.ser_send(pid=0x02, pkg_len=pkt_len, pkg=img_data[-1])[4]
+            self.down_packet(img_pkt)
+        self.down_packet(img_data[-1], end=True)
 
     def read_info_page(self):
         """
@@ -317,7 +387,22 @@ class R503:
 
     def store(self, buffer_id, page_id, timeout=2):
         """
-        Store the template of buffer1 or buffer2 on the flash library
+        Store a fingerprint template to the module's flash library.
+
+        This function stores the template from the specified buffer
+        (buffer1 or buffer2) to the page number in the flash library.
+
+        Parameters:
+            buffer_id (int): 1 for buffer1, 2 for buffer2
+            page_id (int): Page number to store the template
+            timeout (int): Timeout in seconds. Default is 2.
+
+        Returns:
+            conf_code (int): The confirmation code received after storing.
+                0 means success.
+
+        It packs the buffer and page IDs into a package, sends the store
+        command with the package, and returns the confirmation code response.
         """
         package = pack('>BH', buffer_id, page_id)
         read_conf_code = self.ser_send(pkg_len=0x06, instr_code=0x06, pkg=package, timeout=timeout)
@@ -471,13 +556,60 @@ class R503:
         return position, match_score
 
     def read_prod_info(self):
+        """
+        Read product information from the fingerprint sensor.
+
+        It sends the command, checks the confirmation code, and if
+        successful, slices the info byte string into 9 parts:
+
+        - Manufacturer name:
+        - Model number:
+        - Serial number:
+        - Hardware version:
+        - Sensor type:
+        - Sensor image width:
+        - Sensor image height:
+        - Template size:
+        - Fingerprint database size:
+
+        Parameters:
+            self: The R503 instance
+
+        Returns:
+            Tuple of 9 info strings if successful, else 99
+        """
         info = self.ser_send(pkg_len=0x03, instr_code=0x3c)
         if info[4] == 99:
             return 99
-        info = info[5]
-        return info[:16], info[16:20], info[20:28], info[28:30], info[30:38], info[38:40], info[40:42], info[42:44], info[44:46]
+        inf = info[5]
+        return inf[:16], inf[16:20], inf[20:28], inf[28:30], inf[30:38], inf[38:40], inf[40:42], inf[42:44], inf[44:46]
 
     def read_prod_info_decode(self):
+        """
+        Decode raw product info into a human-readable dictionary.
+
+        This calls read_prod_info() to get the raw info bytes.
+        If it returns 99 (error), this returns 99.
+
+        Otherwise, it decodes the raw bytes into a dictionary:
+
+        - module_type: ASCII string
+        - batch_number: ASCII string
+        - serial_number: ASCII string
+        - hw_main_version: Integer
+        - hw_sub_version: Integer
+        - sensor_type: ASCII string
+        - image_width: Integer
+        - image_height: Integer
+        - template_size: Integer
+        - fp_database_size: Integer
+
+        Parameters:
+           self: The R503 instance
+
+        Returns:
+           dict: Decoded product info if successful, else 99
+        """
         inf = self.read_prod_info()
         if inf == 99:
             return 99
@@ -597,9 +729,10 @@ if __name__ == '__main__':
     # for y in x:
     #     print(y)
     # print('reading completed')
-    # y = fp.down_image(x)
+    # fp.down_image(x)
 
-    print(fp.read_prod_info_decode())
-    # print(fp.verify_pw())
+    # print(fp.read_prod_info_decode())
+    # print(fp.read_sys_para_decode())
+
     print('end.')
     fp.ser_close()
