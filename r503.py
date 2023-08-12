@@ -529,9 +529,9 @@ class R503:
         temp = self.ser_send(pkg_len=0x04, instr_code=0x1f, pkg=index_page)
         if temp[4] == 99:
             return 99
-        temp = temp[5]
+        temp0 = temp[5]
         temp_indx = []
-        for n, lv in enumerate(temp):
+        for n, lv in enumerate(temp0):
             temp_indx.extend(8 * n + i for i in range(8) if (lv >> i) & 1)
         return temp_indx
 
@@ -627,10 +627,29 @@ class R503:
         }
 
     def get_fw_ver(self):
+        """
+        Get firmware version.
+        Parameters:
+            self (R503): The R503 instance.
+        Returns:
+            (int, int): A tuple containing the confirmation code and firmware version.
+
+            The serial number is returned in recv_data[4].
+            The firmware version is returned in recv_data[5].
+        """
         recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x3A)
         return recv_data[4], recv_data[5]
 
     def get_alg_ver(self):
+        """
+        Get the algorithm version from the fingerprint sensor.
+        Parameters:
+            self (R503): The R503 instance.
+        Returns:
+            (int, int): A tuple containing the algorithm version.
+            The confirmation code is returned as the first tuple value.
+            The algorithm version is returned as the second tuple value.
+        """
         recv_data = self.ser_send(pid=0x01, pkg_len=3, instr_code=0x39)
         return recv_data[4], recv_data[5]
 
