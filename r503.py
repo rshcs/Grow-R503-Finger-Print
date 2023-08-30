@@ -29,12 +29,10 @@ class R503:
         self.pw = pack('>I', pw)
         self.addr = pack('>I', addr)
         self.recv_size = recv_size
-        try:
-            self.ser = serial.Serial(f'COM{port}', baudrate=baud, timeout=timeout)
-        except serial.serialutil.SerialException:
-            sys.exit('Serial port not found !')
+        self.ser = serial.Serial(f'COM{port}', baudrate=baud, timeout=timeout)
 
-    def conf_codes(self):
+    @staticmethod
+    def conf_codes():
         """
         Read confirmation codes from the json file.
         This function opens the 'confirmation_codes.json' file,
@@ -767,7 +765,7 @@ class R503:
 
 
 if __name__ == '__main__':
-    fp = R503()
+    fp = R503(8)
 
     # msg = fp.read_valid_template_num()
     # print(msg)
