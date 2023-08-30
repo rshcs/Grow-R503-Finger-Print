@@ -6,10 +6,26 @@ import json
 
 
 class R503:
+    """
+    R503 class for interacting with R503 fingerprint sensor module.
+    """
     header = pack('>H', 0xEF01)
     pid_cmd = 0x01  # pid_command packet
     
-    def __init__(self, port=5, baud=57600, pw=0, addr=0xFFFFFFFF, timeout=1, recv_size=128):
+    def __init__(self, port, baud=57600, pw=0, addr=0xFFFFFFFF, timeout=1, recv_size=128):
+        """
+        Initialize the R503 class instance.
+        Parameters:
+          port (int): The COM port number
+          baud (int): The baud rate, default 57600
+          pw (int): The password, default 0
+          addr (int): The module address, default 0xFFFFFFFF
+          timeout (int): The serial timeout in seconds, default 1
+          recv_size (int): The receive buffer size, default 128
+        This initializes the R503 instance attributes like pw, addr etc.
+        It opens the serial port with the given parameters.
+        If the serial port is not found, it exits the program with an error.
+        """
         self.pw = pack('>I', pw)
         self.addr = pack('>I', addr)
         self.recv_size = recv_size
@@ -516,6 +532,11 @@ class R503:
         return read_conf_code[4]
 
     def read_valid_template_num(self):
+        """
+        Read number of valid templates stored in module.
+        Returns:
+            num_templates (int): Number of valid templates stored.
+        """
         read_pkg = self.ser_send(pkg_len=0x03, instr_code=0x1d)
         return unpack('>H', read_pkg[5])[0]
 
@@ -537,7 +558,15 @@ class R503:
 
     def auto_enroll(self, location_id, duplicate_id=1, duplicate_fp=1, ret_status=1, finger_leave=1):
         """
-        Automatic registration a template
+        Automatically register a fingerprint template.
+        Parameters:
+          location_id (int): The location ID to store the template.
+          duplicate_id (int): The duplicate check method.
+          duplicate_fp (int): Whether to return duplicate finger status.
+          ret_status (int): Return registration status.
+          finger_leave (int): Whether finger leaves sensor during registration.
+        Returns:
+            The confirmation code 0 if success
         """
         package = pack('>BBBBB', location_id, duplicate_id, duplicate_fp, ret_status, finger_leave)
         read_pkg = self.ser_send(pkg_len=0x08, instr_code=0x31, pkg=package)
@@ -654,12 +683,21 @@ class R503:
         return recv_data[4], recv_data[5]
 
     def soft_reset(self):
+        """
+        Perform a soft reset of the R503 module.
+        Parameters:
+            self (R503): The R503 instance.
+        Returns:
+            conf_code (int): The confirmation code received after
+                resetting the module. 0 means success.
+        """
         return self.ser_send(pid=0x01, pkg_len=3, instr_code=0x3D)[4]
 
     def get_random_code(self):
         """
-        Generates a random number
-        returns: (unsigned 4 bytes integer)
+        Generate a random 32-bit integer from the sensor module.
+        Returns:
+            random_num (int): The 32-bit random integer value if success else 99
         """
         read_pkg = self.ser_send(pkg_len=0x03, pid=0x01, instr_code=0x14)
         return 99 if read_pkg[4] == 99 else unpack('>I', read_pkg[5])[0]
@@ -691,8 +729,12 @@ class R503:
 
     def read_notepad(self, page_no):
         """
-        Read the specific page of the flash memory
-        returns: (int) status code, (bytearray) data in the page
+        Read data from a specific notepad page in module memory.
+        Parameters:
+            page_no (int): The page number to read, 0-15
+        Returns:
+            status (int): Status code, -1 if invalid page
+            data (bytearray): Data read from the page
         """
         if page_no > 0x0F or page_no < 0:
             return -1
@@ -701,7 +743,17 @@ class R503:
 
     def ser_send(self, pkg_len, instr_code, pid=pid_cmd, pkg=None, timeout=1):
         """
-        pid, pkg_len, instr_code, pkg
+        Send a command packet to the R503 module and receive response.
+        Parameters:
+          pkg_len (int): Length of the payload
+          instr_code (int): Instruction code
+          pid (int): Packet ID, default is command packet ID
+          pkg (bytes): Payload data
+          timeout (int): Serial timeout in seconds
+        Returns:
+          result (list): Parsed response packet:
+            [header, address, pid, pkg_len, conf_code, payload, checksum]
+            If no response, an error list is returned.
         """
         send_values = pack('>BHB', pid, pkg_len, instr_code)
         if pkg is not None:
