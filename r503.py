@@ -1,7 +1,6 @@
 import serial
 from time import sleep, time
 from struct import pack, unpack
-import sys
 import json
 
 
@@ -24,7 +23,6 @@ class R503:
           recv_size (int): The receive buffer size, default 128
         This initializes the R503 instance attributes like pw, addr etc.
         It opens the serial port with the given parameters.
-        If the serial port is not found, it exits the program with an error.
         """
         self.pw = pack('>I', pw)
         self.addr = pack('>I', addr)
@@ -313,6 +311,17 @@ class R503:
         self.down_packet(img_data[-1], end=True)
 
     def down_packet(self, img_pkt, end=False):
+        """
+        Send a downlink data packet to the sensor module.
+
+        Parameters:
+           img_pkt (bytes): The image packet data to send.
+           end (bool): Whether this packet indicates the end of the image.
+               Default is False.
+
+        Returns:
+           None
+        """
         pkt_len = len(img_pkt)
         content = pack(f'>BH{pkt_len}s', 0x08 if end else 0x02, pkt_len+2, img_pkt)
         checksum = sum(content)
@@ -343,8 +352,17 @@ class R503:
 
     def down_char(self, img_data, buffer_id=1):
         """
-        Download a template from the upper computer to modular buffer
-        returns: (int) confirmation code
+        Download a fingerprint template to the sensor module buffer.
+
+        Parameters:
+            img_data (list): The fingerprint template data split into packets.
+            buffer_id (int): The buffer ID to download to. Default is 1.
+
+        Returns:
+            int: The confirmation code from the module.
+
+        This function downloads a full fingerprint template in packets
+        to the specified buffer on the sensor module.
         """
         recv_data0 = self.ser_send(pid=0x01, pkg_len=0x04, instr_code=0x09, pkg=pack('>B', buffer_id))
         if recv_data0[4]:
