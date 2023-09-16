@@ -168,5 +168,11 @@ Terminal output:
 
 ---
 
+For Linux users: if a permission error occurs while opening the serial port, run following command:
 
+`sudo chmod a+rw /dev/ttyUSB{your device port number}`
+
+Etc:
+
+`sudo chmod a+rw /dev/ttyUSB0`
 
