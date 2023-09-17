@@ -70,7 +70,7 @@
 
 Terminal output:
 
-![Fingerprint registering](fingerprint_registering.png)
+![Fingerprint registering](https://imageupload.io/ib/bXdm1pZorgqy7OV_1694921730.png)
 
 ---
 
@@ -87,7 +87,7 @@ Terminal output:
 
 Terminal output:
 
-![Fingerprint matching status](fp_location.png)
+![Fingerprint matching status](https://imageupload.io/ib/Js7YOdWC1dH60wM_1694921730.png)
 
 * first value = success if 0
 * second value = stored location of the memory
@@ -104,7 +104,7 @@ Number of fingerprints in the memory
 
 Terminal output:
 
-![Number of templates](image.png)
+![Number of templates](https://imageupload.io/ib/ZfQrbcIpIxsbsmf_1694921730.png)
 
 ---
 #### Read fingerprint stored locations
@@ -116,7 +116,7 @@ Terminal output:
 
 Terminal output:
 
-![Fingerprint stored locations](image-1.png)
+![Fingerprint stored locations](https://imageupload.io/ib/Aenb0V36tpulUvc_1694921730.png)
 
 ---
 
@@ -141,7 +141,7 @@ Output: LED keeps on with a specific color according to the number
 
 Terminal output:
 
-![Info](fpinfo.png)
+![Info](https://imageupload.io/ib/QN0Lg6gWEh1rCUL_1694921730.png)
 
 ---
 
