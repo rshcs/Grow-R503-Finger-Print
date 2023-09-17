@@ -28,7 +28,7 @@ class R503:
         self.pw = pack('>I', pw)
         self.addr = pack('>I', addr)
         self.recv_size = recv_size
-        port_name = f'COM{port}' if system == 'Windows' else f'/dev/ttyUSB{port}'
+        port_name = f'COM{port}' if system() == 'Windows' else f'/dev/ttyUSB{port}'
         self.ser = serial.Serial(port_name, baudrate=baud, timeout=timeout)
 
     @staticmethod
@@ -477,7 +477,7 @@ class R503:
                     print('Character file generation failed !')
                     inc -= 1
                 if finger_prints >= num_of_fps:
-                    print('registering a finger print')
+                    print('registering the finger print')
                     if not self.reg_model():
                         if not self.store(buffer_id=buffer_id, page_id=location):
                             print('finger print registered successfully.')
@@ -785,43 +785,8 @@ class R503:
 
 
 if __name__ == '__main__':
-    fp = R503(0)
+    fp = R503(port=5)
 
-    # msg = fp.read_valid_template_num()
-    # print(msg)
-    # msg = fp.get_image_ex()
-    # print(msg)
-    # if msg == 0:
-    #     print('generating char file')
-    #     msg2 = fp.img2tz(buffer_id=1)
-    #     print(msg2)
+    fp.read_sys_para_decode()
 
-    # loc = fp.get_available_location()
-    # print(loc)
-    # fp.manual_enroll(location=loc)
-    # sleep(3)
-    # vt = fp.search()
-    # print(vt)
-    # indx_table = fp.read_index_table()
-    # print(indx_table)
-
-    # x = fp.get_image_ex()
-    # print(f'image captured: {x}')
-    # y = fp.up_image()
-    # print(y)
-    # print('Put the finger on the sensor...')
-    # sleep(3)
-    # fp_get = fp.get_image_ex()
-    # print('error' if fp_get else 'success')
-    # x = fp.up_image()
-    # print(len(x))
-    # for y in x:
-    #     print(y)
-    # print('reading completed')
-    # fp.down_image(x)
-
-    # print(fp.read_prod_info_decode())
-    # print(fp.read_sys_para_decode())
-
-    print('end.')
     fp.ser_close()

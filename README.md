@@ -64,26 +64,13 @@
     from r503 import R503
 
     fp = R503(port=5)
-    fp.manual_enroll(location=7)
+    fp.manual_enroll(location=8)
 
 * you have to place the finger 4 (changeable) times on the sensor during the process
 
 Terminal output:
 
-    Place your finger on the sensor: 1
-    Reading the finger print
-    Character file generation successful.
-    Place your finger on the sensor: 2
-    Reading the finger print
-    Character file generation successful.
-    Place your finger on the sensor: 3
-    Reading the finger print
-    Character file generation successful.
-    Place your finger on the sensor: 4
-    Reading the finger print
-    Character file generation successful.
-    registering a finger print
-    finger print registered successfully.
+![Fingerprint registering](fingerprint_registering.png)
 
 ---
 
@@ -95,13 +82,12 @@ Terminal output:
     fp = R503(port=5)
     
     print('Place your finger on the sensor..')
-    sleep(3)
+    sleep(3) # Not required to add this line
     print(fp.search())
 
 Terminal output:
 
-    Place your finger on the sensor..
-    (0, 7, 90)
+![Fingerprint matching status](fp_location.png)
 
 * first value = success if 0
 * second value = stored location of the memory
@@ -118,7 +104,7 @@ Number of fingerprints in the memory
 
 Terminal output:
 
-    Num of templates: 3
+![Number of templates](image.png)
 
 ---
 #### Read fingerprint stored locations
@@ -130,7 +116,7 @@ Terminal output:
 
 Terminal output:
 
-    [7, 15, 32]
+![Fingerprint stored locations](image-1.png)
 
 ---
 
@@ -155,20 +141,11 @@ Output: LED keeps on with a specific color according to the number
 
 Terminal output:
 
-    module type :  R5xx1111
-    batch number :  1111
-    serial number :  10080307
-    hw main version :  1
-    hw sub version :  1
-    sensor type :  GR192RGB
-    image width :  192
-    image height :  192
-    template size :  1536
-    fp database size :  200
+![Info](fpinfo.png)
 
 ---
 
-For Linux users: if a permission error occurs while opening the serial port, run following command:
+For Linux users: if a permission error occurs while opening the serial port, run the following command:
 
 `sudo chmod a+rw /dev/ttyUSB{your device port number}`
 
