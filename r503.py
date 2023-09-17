@@ -1,6 +1,7 @@
 import serial
 from time import sleep, time
 from struct import pack, unpack
+from platform import system
 import json
 
 
@@ -27,7 +28,8 @@ class R503:
         self.pw = pack('>I', pw)
         self.addr = pack('>I', addr)
         self.recv_size = recv_size
-        self.ser = serial.Serial(f'COM{port}', baudrate=baud, timeout=timeout)
+        port_name = f'COM{port}' if system == 'Windows' else f'/dev/ttyUSB{port}'
+        self.ser = serial.Serial(port_name, baudrate=baud, timeout=timeout)
 
     @staticmethod
     def conf_codes():
@@ -783,7 +785,7 @@ class R503:
 
 
 if __name__ == '__main__':
-    fp = R503(8)
+    fp = R503(0)
 
     # msg = fp.read_valid_template_num()
     # print(msg)
