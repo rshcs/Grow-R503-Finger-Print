@@ -52,9 +52,14 @@
 
 ### Installation
 
-* Run `pip install pyserial` on terminal.
+Method 1: 
+* Run `pip install r503` on terminal 
 
+Method 2:
+* Run `pip install pyserial` on terminal.
 * Download **r503.py** file.
+* Download **confirmation_codes.json** file.
+* Place downloaded files in the project directory
 
 ### Basic usage overview
 
@@ -162,4 +167,9 @@ For Linux users: if a permission error occurs while opening the serial port, run
 Etc:
 
 `sudo chmod a+rw /dev/ttyUSB0`
+
+References:
+
+- [pypi.org/r503](https://pypi.org/project/r503/)
+- [grow-r503-docs.readthedocs.io](https://grow-r503-docs.readthedocs.io/en/latest/r503.html)
 
