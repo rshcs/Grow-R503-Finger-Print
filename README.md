@@ -119,6 +119,16 @@ Terminal output:
 ![Fingerprint stored locations](https://i.ibb.co/drXhRRB/temp-locations.png)
 
 ---
+#### Delete a fingerprint
+
+    from r503 import R503
+    
+    fp = R503(port=5)
+    fp.delete_char(6)
+
+Deletes the fingerprint record at given index
+
+---
 
 #### Aura LED Control
 
