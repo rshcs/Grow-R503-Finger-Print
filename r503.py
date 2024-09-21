@@ -39,11 +39,18 @@
 #   bytes indicated by 'len' instead of waiting for a timeout each time;
 #   eliminate 'R503.rcv _size'
 
+# ******************************************************************
+# - Recv_size required to be specified in-order receive expected number of bytes
+# - Confirmation codes can be changed as the sensor version, so it's more convenient to change the confirmation_codes.json
+#   file rather than changing the code base
+# - recv_size cannot be considered as a fixed value
+# ******************************************************************
 
 import serial
 from time import sleep, time
 from struct import pack, unpack
 from platform import system
+import json
 
 
 def to_hex (packet):
@@ -62,11 +69,11 @@ class R503:
     header = pack('>H', 0xEF01)
     pid_cmd = 0x01  # pid_command packet
 
-    def __init__(self, port, baud=57600, pw=0, addr=0xFFFFFFFF, timeout=1):
+    def __init__(self, port, baud=57600, pw=0, addr=0xFFFFFFFF, timeout=1, recv_size=128):
         """
         Initialize the R503 class instance.
         Parameters:
-          port (int): The COM port number (Windows) or device file name (Linux)
+          port (int or str): The COM port number (Windows) or device file name (Linux)
           baud (int): The baud rate, default 57600
           pw (int): The password, default 0
           addr (int): The module address, default 0xFFFFFFFF
@@ -76,11 +83,27 @@ class R503:
         """
         self.pw = pack('>I', pw)
         self.addr = pack('>I', addr)
-        if (isinstance (port, int)):
+        self.recv_size = recv_size
+        if isinstance (port, int):
           port_name = f'COM{port}' if system() == 'Windows' else f'/dev/ttyUSB{port}'
         else:
           port_name = port
         self.ser = serial.Serial (port_name, baudrate=baud, timeout=timeout)
+
+    @staticmethod
+    def conf_codes():
+        """
+        Read confirmation codes from the json file.
+        This function opens the 'confirmation_codes.json' file,
+        loads the JSON data from it, and returns the loaded JSON object.
+        Parameters:
+            self: The R503 class instance.
+        Returns:
+            jsob: The loaded JSON object containing the confirmation codes.
+        """
+        with open('confirmation_codes.json', 'r') as jf:
+            jsob = json.load(jf)
+        return jsob
 
     def ser_close(self):
         """
@@ -209,12 +232,16 @@ class R503:
                 the package length. 0 means success.
 
         It maps the package lengths to index values, checks if valid,
-        sends the set command, and returns the confirmation code response.
+        sends the set command, updates self.recv_size if successful,
+        and returns the confirmation code response.
         """
         pkg_len0 = {32: 0, 64: 1, 128: 2, 256: 3}.get(pkg_len)
         if pkg_len0 not in [0, 1, 2, 3]:
             return 102
         conf_code = self.ser_send(pid=0x01, pkg_len=0x05, instr_code=0x0E, pkg=pack('>BB', 6, pkg_len0))[4]
+        if conf_code: # if not successful
+            return conf_code
+        self.recv_size = pkg_len
         return conf_code
 
     def read_sys_para(self):
@@ -294,46 +321,8 @@ class R503:
         parameter: (int) c_code - confirmation code
         returns: (str) decoded confirmation code
         """
-        cc = {
-              0: "00h: command execution complete",
-              1: "01h: error when receiving data package",
-              2: "02h: no finger on the sensor",
-              3: "03h: fail to enroll the finger",
-              6: "06h: fail to generate character file due to the over-disorderly fingerprint image",
-              7: "07h: fail to generate character file due to lackness of character point or over-smallness of fingerprint image",
-              8: "08h: finger does not match",
-              9: "09h: fail to find the matching finger",
-             10: "0Ah: fail to combine the character files",
-             11: "0Bh: addressing PageID is beyond the finger library",
-             12: "0Ch: error when reading template from library or the template is invalid",
-             13: "0Dh: error when uploading template",
-             14: "0Eh: Module cannot receive the following data packages.",
-             15: "0Fh: error when uploading image",
-             16: "10h: fail to delete the template",
-             17: "11h: fail to clear finger library",
-             19: "13h: wrong password!",
-             21: "15h: fail to generate the image for the lackness of valid primary image",
-             24: "18h: error when writing flash",
-             25: "19h: No definition error",
-             32: "20h: the address code is incorrect",
-             33: "21h: password must be verified",
-             34: "22h: fingerprint template is empty",
-             36: "24h: fingerprint library is empty",
-             38: "26h: timeout",
-             39: "27h: fingerprints already exist",
-             41: "29h: sensor hardware error",
-             26: "1Ah: invalid register number",
-             27: "1Bh: incorrect configuration of register",
-             28: "1Ch: wrong notepad page number",
-             29: "1Dh: fail to operate the communication port",
-             31: "1Fh: fingerprint library is full",
-            252: "FCh: unsupported command",
-            253: "FDh: hardware error",
-            254: "FEh: command execution failure",
-             99: "Data not received from the module **",
-            101: "Incorrect page number or content length **",
-            102: "Not an expected argument"
-          }
+        cc = self.conf_codes()
+        c_code = str(c_code)
         return cc[c_code] if c_code in cc else 'others: system reserved'
 
     def load_char(self, page_id, buffer_id=1):
@@ -596,10 +585,12 @@ class R503:
         parameters: buff_num = character buffer id, start_id = starting from, para = end position
         returns: (tuple) status [success:0, error:1, no match:9], template number, match score
         """
+        self.get_image_ex()
+        self.img2tz(1)  # Character file need to be stored in the given charBuffer
         package = pack('>BHH', buff_num, start_id, para)
         recv_data = self.ser_send(pid=0x01, pkg_len=0x08, instr_code=0x04, pkg=package)
         if recv_data[4] == 99:
-            return (99, -1, 0)
+            return 99
         temp_num, match_score = unpack('>HH', recv_data[5])
         return recv_data[4], temp_num, match_score
 
@@ -666,7 +657,7 @@ class R503:
         package = pack('>BBBBB', security_lvl, start_pos, end_pos, ret_key_step, num_of_fp_errors)
         read_pkg = self.ser_send(pkg_len=0x08, instr_code=0x32, pkg=package, timeout=10)
         if read_pkg[4] == 99:
-            return -1, 0
+            return 99
         _, position, match_score = unpack('>BHH', read_pkg[5])
         return position, match_score
 
@@ -846,24 +837,10 @@ class R503:
             send_values += pkg
         check_sum = sum(send_values)
         send_values = self.header + self.addr + send_values + pack('>H', check_sum)
-        # ~ print ("### ser_send: ", to_hex (send_values))
-        try:
-          self.ser.timeout = timeout
-          self.ser.write(send_values)
-          read_val = self.ser.read (9)
-        except serial.serialutil.SerialException:
-          read_val = b''
-        if len (read_val) != 9:
-          return [0, 0, 0, 0, 99, None, 0]
-        read_val += self.ser.read (unpack ('>H', read_val[7:9]) [0])
-        sum_calculated = sum (read_val[6:-2])
-        sum_received = unpack ('>H', read_val[-2:])[0]
-        # ~ print ("### ... received: ", to_hex (read_val))
-        if sum_calculated != sum_received:
-          return [0, 0, 0, 0, 99, None, 0]
-          # no dedicated error code for checksums, since in many places in this file,
-          # only 99 is treated as an error code
-        return self.read_msg(read_val)
+        self.ser.timeout = timeout
+        self.ser.write(send_values)
+        read_val = self.ser.read(self.recv_size)
+        return [0, 0, 0, 0, 99, None, 0] if read_val == b'' else self.read_msg(read_val)
 
 
 if __name__ == '__main__':
