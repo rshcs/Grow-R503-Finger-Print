@@ -785,8 +785,11 @@ class R503:
 
 
 if __name__ == '__main__':
-    fp = R503(port=5)
+    fp = R503(port=0)
 
-    fp.read_sys_para_decode()
+    sys_para = fp.read_sys_para_decode()
+    for k, v in sys_para.items():
+        print(k, ':', v)
+
 
     fp.ser_close()
