@@ -40,6 +40,8 @@
 #   eliminate 'R503.rcv _size'
 
 # ******************************************************************
+# Revision:
+
 # - Recv_size required to be specified in-order receive expected number of bytes
 # - Confirmation codes can be changed as the sensor version, so it's more convenient to change the confirmation_codes.json
 #   file rather than changing the code base
@@ -78,6 +80,7 @@ class R503:
           pw (int): The password, default 0
           addr (int): The module address, default 0xFFFFFFFF
           timeout (int): The serial timeout in seconds, default 1
+          recv_size (int): The receive buffer size, default 128
         This initializes the R503 instance attributes like pw, addr etc.
         It opens the serial port with the given parameters.
         """
