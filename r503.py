@@ -1,8 +1,67 @@
+# This file is derived from https://github.com/rshcs/Grow-R503-Finger-Print/
+# with some modifications for the Home2L project.
+#
+# MIT License
+#
+# Copyright (c) 2023 RoshanCS
+#               2024 Gundolf Kiefer (Home2L adaptions only)
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+
+# Modifications by Gundolf Kiefer:
+#
+# - add license header
+#
+# - eliminate 'confirmation_codes.json' to avoid file search issues
+#
+# - __init__: allow to pass a device file name as a 'port' (e.g. 'dev/ttyUSB0' on Linux)
+#
+# - ser_send: Add checksum verification
+#
+# - ser_send: considerably improve performance by receiving the exact mumber of
+#   bytes indicated by 'len' instead of waiting for a timeout each time;
+#   eliminate 'R503.rcv _size'
+
+# ******************************************************************
+# Revision:
+
+# - Recv_size required to be specified in-order receive expected number of bytes
+# - Confirmation codes can be changed as the sensor version, so it's more convenient to change the confirmation_codes.json
+#   file rather than changing the code base
+# - recv_size cannot be considered as a fixed value
+# ******************************************************************
+
 import serial
 from time import sleep, time
 from struct import pack, unpack
 from platform import system
 import json
+
+
+def to_hex (packet):
+  """
+  Helper to convert a packed byte array to a readable hex string (for debugging only).
+  """
+  s = ""
+  for b in packet: s += " {:02x}".format (b)
+  return s.strip ()
 
 
 class R503:
@@ -11,12 +70,12 @@ class R503:
     """
     header = pack('>H', 0xEF01)
     pid_cmd = 0x01  # pid_command packet
-    
+
     def __init__(self, port, baud=57600, pw=0, addr=0xFFFFFFFF, timeout=1, recv_size=128):
         """
         Initialize the R503 class instance.
         Parameters:
-          port (int): The COM port number
+          port (int or str): The COM port number (Windows) or device file name (Linux)
           baud (int): The baud rate, default 57600
           pw (int): The password, default 0
           addr (int): The module address, default 0xFFFFFFFF
@@ -28,8 +87,11 @@ class R503:
         self.pw = pack('>I', pw)
         self.addr = pack('>I', addr)
         self.recv_size = recv_size
-        port_name = f'COM{port}' if system() == 'Windows' else f'/dev/ttyUSB{port}'
-        self.ser = serial.Serial(port_name, baudrate=baud, timeout=timeout)
+        if isinstance (port, int):
+          port_name = f'COM{port}' if system() == 'Windows' else f'/dev/ttyUSB{port}'
+        else:
+          port_name = port
+        self.ser = serial.Serial (port_name, baudrate=baud, timeout=timeout)
 
     @staticmethod
     def conf_codes():
@@ -180,7 +242,7 @@ class R503:
         if pkg_len0 not in [0, 1, 2, 3]:
             return 102
         conf_code = self.ser_send(pid=0x01, pkg_len=0x05, instr_code=0x0E, pkg=pack('>BB', 6, pkg_len0))[4]
-        if conf_code:
+        if conf_code: # if not successful
             return conf_code
         self.recv_size = pkg_len
         return conf_code
@@ -527,7 +589,7 @@ class R503:
         returns: (tuple) status [success:0, error:1, no match:9], template number, match score
         """
         self.get_image_ex()
-        self.img2tz(1)
+        self.img2tz(1)  # Character file need to be stored in the given charBuffer
         package = pack('>BHH', buff_num, start_id, para)
         recv_data = self.ser_send(pid=0x01, pkg_len=0x08, instr_code=0x04, pkg=package)
         if recv_data[4] == 99:
@@ -785,8 +847,11 @@ class R503:
 
 
 if __name__ == '__main__':
-    fp = R503(port=5)
+    fp = R503(port=0)
 
-    fp.read_sys_para_decode()
+    sys_para = fp.read_sys_para_decode()
+    for k, v in sys_para.items():
+        print(k, ':', v)
+
 
     fp.ser_close()
