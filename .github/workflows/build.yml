@@ -1,0 +1,37 @@
+name: SonarCloud Analysis
+
+on:
+  push:
+    branches:
+      - '*'
+
+jobs:
+  sonarcloud:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'  # Use your Python version
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install sonar-scanner
+
+      - name: SonarCloud Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          sonar-scanner \
+            -Dsonar.organization="RoshanCS" \
+            -Dsonar.projectKey="Grow-R503-Finger-Print" \
+            -Dsonar.sources="." \
+            -Dsonar.host.url="https://sonarcloud.io" \
+            -Dsonar.python.version="3.11" \
+            -Dsonar.login="${{ secrets.SONAR_TOKEN }}"
