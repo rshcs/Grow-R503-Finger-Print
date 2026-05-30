@@ -4,6 +4,7 @@
 ![licence_mit](https://img.shields.io/badge/licence-MIT-orange)
 ![commits](https://img.shields.io/github/last-commit/rshcs/Grow-R503-Finger-Print)
 
+Same library implementation in Micropython: https://github.com/rshcs/r503_uPython
 
 # GROW R503 Fingerprint 
 
